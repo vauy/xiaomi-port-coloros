@@ -23,12 +23,10 @@ if [ -n "$KERNEL_SOURCE_REPO" ]; then
   fi
 
   if [ -d kernel_src ]; then
-    # 优先找实际 .config
     if [ -f kernel_src/.config ]; then
       cp kernel_src/.config "$CONFIG_OUT"
       echo "    从 .config 提取成功"
     else
-      # 退化到 defconfig
       DEFCONFIG=$(find kernel_src/arch/arm64/configs/ -name "*defconfig" 2>/dev/null | head -1)
       if [ -n "$DEFCONFIG" ]; then
         cp "$DEFCONFIG" "$CONFIG_OUT"
@@ -51,13 +49,11 @@ if [ ! -s "$CONFIG_OUT" ]; then
 
   KERNEL_IMG="base_boot/kernel"
 
-  # 如果 boot.img 里没有，尝试 vendor_boot.img
   if [ ! -f "$KERNEL_IMG" ] && [ -f base/vendor_boot.img ]; then
     unpack_bootimg --boot_img base/vendor_boot.img --out base_boot/ 2>/dev/null || true
     KERNEL_IMG="base_boot/kernel"
   fi
 
-  # 用 extract-ikconfig 提取
   if [ -f "$KERNEL_IMG" ] && [ -f scripts/extract-ikconfig ]; then
     bash scripts/extract-ikconfig "$KERNEL_IMG" > "$CONFIG_OUT" 2>/dev/null || true
   fi
