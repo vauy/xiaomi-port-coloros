@@ -1,21 +1,24 @@
 # xiaomi-port-coloros
 
-小米 → ColorOS 16 半自动移植工作流。
+小米 → ColorOS / GSI 半自动移植工作流。
 
-基于 GitHub Actions，把「下载、解包、内核分析、Root 集成、编译、精简、替换、修复、打包、验证、上传」全部串成一条流水线。
+基于 GitHub Actions，把「下载、解包、内核分析、Root 集成、编译、精简、替换、修复、打包、验证、上传」串成一条流水线。
 
 ---
 
 ## 📋 目录
 
 - [快速开始](#快速开始)
-- [工作流步骤](#工作流步骤)
+- [仓库结构](#仓库结构)
+- [三个工作流](#三个工作流)
+- [配置文件](#配置文件)
 - [精简 APP 对照表](#精简-app-对照表)
 - [替换应用对照表](#替换应用对照表)
 - [系统级修复开关](#系统级修复开关)
 - [机型专属配置](#机型专属配置)
 - [上传方式](#上传方式)
 - [内核 Root 集成](#内核-root-集成)
+- [MTK BPF 补丁](#mtk-bpf-补丁)
 - [内核编译失败排查](#内核编译失败排查)
 - [脚本说明](#脚本说明)
 - [常见问题](#常见问题)
@@ -25,111 +28,156 @@
 ## 🚀 快速开始
 
 1. Fork 本仓库到你的 GitHub 账号
-2. 进入 **Actions** → **Port ColorOS 16** → **Run workflow**
-3. 按界面提示填写：
-   - 底包直链（MIUI/澎湃）
-   - ColorOS 16 移植包直链
-   - 内核源码地址（可选，集成 Root 时需要）
-   - defconfig 名（可选）
-   - 精简/替换/修复开关
-   - 机型专属配置（挖孔坐标等）
-   - 上传方式（默认 123 网盘）
-4. 点 **Run workflow** 开始跑
-5. 跑完后在 123 网盘下载 ROM
+2. 编辑 `.github/workflows/port-config.yml`（或 `patch-gsi-config.yml`、`build-gsi-config.yml`），按需修改开关
+3. 进入 **Actions** → 选择工作流 → **Run workflow**
+4. 填写必填项（底包、ColorOS 包、内核源码、设备树等）
+5. 跑完后在 123 网盘或 Artifact 下载产物
 
 ---
 
-## ⚙️ 工作流步骤
+## 📁 仓库结构
 
-| 步骤 | 脚本 | 说明 |
-|---|---|---|
-| 1. 下载固件 | `download.sh` | 下载底包和 ColorOS 包 |
-| 2. 解包 | `unpack.sh` | 处理 payload.bin / super.img / EROFS |
-| 3. 分析内核配置 | `analyze-kernel.sh` | 优先源码，其次镜像提取 .config |
-| 4. 集成 Root | `integrate-root.sh` | KernelSU Next 优先，失败回退原版 |
-| 5. 编译内核 | `build-kernel.sh` | 编译带 Root 的内核，失败自动回退 |
-| 6. 合并分区 | `merge-partitions.sh` | 合并 my 分区、补 system_ext |
-| 7. 精简 APP | `debloat.sh` | 按开关删除指定 APP |
-| 8. 替换应用 | `replace-apps.sh` | 删除原应用 → 下载 → 植入 → 设默认 |
-| 9. 系统级修复 | `system-fixes.sh` | OpenID/SELinux/音频/振动等 |
-| 10. 机型补丁 | `apply-patches.sh` | AVB/挖孔/first_api_level |
-| 11. 修复 fstab | `fix-fstab.sh` | 清理 AVB 校验参数 |
-| 12. 打包 | `pack.sh` | 输出卡刷包或 super.img |
-| 13. 验证镜像 | `verify.sh` | 检查格式、分区表、挂载 |
-| 14. 日志分析 | `analyze-and-fix.sh` | 自动修复确定性问题 |
-| 15. 回滚 | `rollback-fix.sh` | 二次验证失败时回滚 |
-| 16. 上传 | `upload-*.sh` | 上传到 123 网盘/R2/Alist/Release |
+```
+xiaomi-port-coloros/
+├── .github/workflows/
+│   ├── README.md                  # 工作流说明
+│   ├── port.yml                   # ColorOS 完整移植
+│   ├── port-config.yml            # 移植配置
+│   ├── patch-gsi.yml              # 修补现成 GSI
+│   ├── patch-gsi-config.yml       # 修补配置
+│   ├── build-gsi.yml              # 构建专属 GSI
+│   └── build-gsi-config.yml       # 构建配置
+├── scripts/
+│   ├── download.sh
+│   ├── unpack.sh
+│   ├── analyze-kernel.sh
+│   ├── integrate-root.sh
+│   ├── build-kernel.sh
+│   ├── merge-partitions.sh
+│   ├── debloat.sh
+│   ├── replace-apps.sh
+│   ├── system-fixes.sh
+│   ├── apply-patches.sh
+│   ├── fix-fstab.sh
+│   ├── pack.sh
+│   ├── verify.sh
+│   ├── analyze-and-fix.sh
+│   ├── rollback-fix.sh
+│   ├── patch-gsi.sh
+│   ├── build-gsi.sh
+│   ├── patch-bpf.sh
+│   ├── upload-pan123.sh
+│   ├── upload-r2.sh
+│   └── upload-alist.sh
+└── README.md
+```
+
+---
+
+## ⚙️ 三个工作流
+
+| 工作流 | 用途 | 编译内核 | 注入设备树 | 耗时 |
+|---|---|---|---|---|
+| `port.yml` | ColorOS 完整移植 | ✅ 可选 | ❌ | 60-120 分钟 |
+| `patch-gsi.yml` | 修补现成 GSI | ❌ | ✅ | 5-15 分钟 |
+| `build-gsi.yml` | 构建专属 GSI | ✅ | ✅ | 40-80 分钟 |
+
+### 推荐使用顺序
+
+1. **`patch-gsi.yml`**：快速验证硬件兼容性
+2. **`build-gsi.yml`**：构建专属 GSI，适配度更高
+3. **`port.yml`**：完整的 ColorOS 移植
+
+---
+
+## 📝 配置文件
+
+所有可选配置集中在 `config.yml` 里，改完提交即可，不用在 Actions 界面里勾。
+
+| 工作流 | 配置文件 |
+|---|---|
+| `port.yml` | `.github/workflows/port-config.yml` |
+| `patch-gsi.yml` | `.github/workflows/patch-gsi-config.yml` |
+| `build-gsi.yml` | `.github/workflows/build-gsi-config.yml` |
+
+### 变量对照
+
+| config 路径 | 环境变量 |
+|---|---|
+| `device.model` | `CFG_DEVICE_MODEL` |
+| `device.system_name` | `CFG_DEVICE_SYSTEM_NAME` |
+| `device.partition_type` | `CFG_DEVICE_PARTITION_TYPE` |
+| `root.enable` | `CFG_ROOT_ENABLE` |
+| `kernel_patch.enable_bpf` | `CFG_KERNEL_PATCH_ENABLE_BPF` |
+| `debloat.ad` | `CFG_DEBLOAT_AD` |
+| `fix.openid` | `CFG_FIX_OPENID` |
+| `gsi_inject.features` | `CFG_GSI_INJECT_FEATURES` |
+| `gsi_output.format` | `CFG_GSI_OUTPUT_FORMAT` |
+| `upload.pan123` | `CFG_UPLOAD_PAN123` |
 
 ---
 
 ## 📦 精简 APP 对照表
 
-| Actions 开关 | 包名 | APP 名称 | 路径 | 风险 |
-|---|---|---|---|---|
-| `debloat_ad` | `com.oplus.ad` | 广告服务 | `my_product/app/AdServices` | 低 |
-| `debloat_app_market` | `com.heytap.market` | OPPO 软件商店 | `my_product/app/AppMarket` | 低 |
-| `debloat_game_center` | `com.oplus.gamecenter` | 游戏中心 | `my_product/app/GameCenter` | 低 |
-| `debloat_browser` | `com.heytap.browser` | ColorOS 浏览器 | `my_product/app/Browser` | 低 |
-| `debloat_content_ext` | `com.oplus.content` | 内容推荐服务 | `my_product/app/ContentExt` | 低 |
-| `debloat_theme_store` | `com.heytap.themestore` | 主题商店 | `my_product/app/ThemeStore` | 低 |
-| `debloat_voice_assistant` | `com.oplus.voiceassistant` | 小布语音助手 | `my_product/app/VoiceAssistant` | 低 |
-| `debloat_music` | `com.oplus.music` | ColorOS 音乐 | `my_product/app/Music` | 低 |
-| `debloat_video` | `com.oplus.video` | ColorOS 视频 | `my_product/app/Video` | 低 |
-| `debloat_feedback` | `com.oplus.feedback` | 用户反馈 | `my_product/app/Feedback` | 低 |
-| `debloat_ota` | `com.oplus.ota` | OTA 更新服务 | `my_product/app/OTA` | 中 |
-
-### 未默认启用，可手动加
-
-| 包名 | APP 名称 | 路径 | 风险 |
+| config 开关 | 包名 | APP 名称 | 风险 |
 |---|---|---|---|
-| `com.oplus.push` | OPPO 推送服务 | `my_product/app/OplusPush` | 中 |
-| `com.oplus.wallpaper` | 动态壁纸 | `my_product/app/Wallpaper` | 中 |
-| `com.oplus.gallery` | 相册 | `my_product/app/Gallery` | 中 |
-| `com.oplus.cloud` | 云服务 | `my_product/app/CloudService` | 高 |
-| `com.oplus.account` | 账号服务 | `my_product/app/OplusAccount` | 高 |
-| `com.oplus.ime` | 自带输入法 | `my_product/app/OplusIme` | 极高 |
-| `com.oplus.camera` | 相机 | `my_product/app/Camera` | 极高 |
+| `debloat.ad` | `com.oplus.ad` | 广告服务 | 低 |
+| `debloat.app_market` | `com.heytap.market` | OPPO 软件商店 | 低 |
+| `debloat.game_center` | `com.oplus.gamecenter` | 游戏中心 | 低 |
+| `debloat.browser` | `com.heytap.browser` | ColorOS 浏览器 | 低 |
+| `debloat.content_ext` | `com.oplus.content` | 内容推荐服务 | 低 |
+| `debloat.theme_store` | `com.heytap.themestore` | 主题商店 | 低 |
+| `debloat.voice_assistant` | `com.oplus.voiceassistant` | 小布语音助手 | 低 |
+| `debloat.music` | `com.oplus.music` | ColorOS 音乐 | 低 |
+| `debloat.video` | `com.oplus.video` | ColorOS 视频 | 低 |
+| `debloat.feedback` | `com.oplus.feedback` | 用户反馈 | 低 |
+| `debloat.ota` | `com.oplus.ota` | OTA 更新服务 | 中 |
+| `debloat.push` | `com.oplus.push` | OPPO 推送服务 | 中 |
+| `debloat.wallpaper` | `com.oplus.wallpaper` | 动态壁纸 | 中 |
+| `debloat.gallery` | `com.oplus.gallery` | 相册 | 中 |
+| `debloat.cloud` | `com.oplus.cloud` | 云服务 | 高 |
+| `debloat.account` | `com.oplus.account` | 账号服务 | 高 |
+| `debloat.ime` | `com.oplus.ime` | 自带输入法 | 极高 |
+| `debloat.camera` | `com.oplus.camera` | 相机 | 极高 |
 
 ---
 
 ## 🔄 替换应用对照表
 
-| Actions 开关 | 原包名 | 原 APP | 替换包名 | 替换 APP | 风险 |
+| config 开关 | 原包名 | 原 APP | 替换包名 | 替换 APP | 风险 |
 |---|---|---|---|---|---|
-| `replace_browser` | `com.heytap.browser` | ColorOS 浏览器 | `mark.via` | Via | 低 |
-| `replace_gallery` | `com.oplus.gallery` | ColorOS 相册 | `com.simplemobiletools.gallery.pro` | Simple Gallery | 中 |
-| `replace_file_manager` | `com.oplus.filemanager` | ColorOS 文件管理 | `me.zhanghai.android.files` | Material Files | 低 |
+| `replace.browser` | `com.heytap.browser` | ColorOS 浏览器 | `mark.via` | Via | 低 |
+| `replace.gallery` | `com.oplus.gallery` | ColorOS 相册 | `com.simplemobiletools.gallery.pro` | Simple Gallery | 中 |
+| `replace.file_manager` | `com.oplus.filemanager` | ColorOS 文件管理 | `me.zhanghai.android.files` | Material Files | 低 |
 
 ---
 
 ## 🩹 系统级修复开关
 
-| Actions 开关 | 修复问题 | 根因 | 风险 |
+| config 开关 | 修复问题 | 根因 | 风险 |
 |---|---|---|---|
-| `fix_openid` | OpenID/OUID 卡顿 | 缺 OPlus 序列号属性 | 低 |
-| `fix_selinux` | SELinux 拒绝 | sepolicy 不匹配 | 中 |
-| `fix_audio` | 音频炸裂 | 音频策略不兼容 | 低 |
-| `fix_vibrator` | 振动异常 | 权限段不匹配 | 低 |
-| `fix_hdr` | 抖音卡顿 | HDR 特性冲突 | 低 |
-| `fix_wechat_scan` | 微信扫一扫 | 相机优化冲突 | 低 |
-| `fix_wallpaper` | 实况壁纸黑屏 | 壁纸服务不兼容 | 中 |
-| `fix_color_temp` | 屏幕色温异常 | 色温曲线不匹配 | 低 |
-| `fix_nfc` | NFC 不可用 | NFC 配置不匹配 | 中 |
-| `fix_modem` | 信号丢失 | modem 配置不匹配 | 高 |
+| `fix.openid` | OpenID/OUID 卡顿 | 缺 OPlus 序列号属性 | 低 |
+| `fix.selinux` | SELinux 拒绝 | sepolicy 不匹配 | 中 |
+| `fix.audio` | 音频炸裂 | 音频策略不兼容 | 低 |
+| `fix.vibrator` | 振动异常 | 权限段不匹配 | 低 |
+| `fix.hdr` | 抖音卡顿 | HDR 特性冲突 | 低 |
+| `fix.wechat_scan` | 微信扫一扫 | 相机优化冲突 | 低 |
+| `fix.wallpaper` | 实况壁纸黑屏 | 壁纸服务不兼容 | 中 |
+| `fix.color_temp` | 屏幕色温异常 | 色温曲线不匹配 | 低 |
+| `fix.nfc` | NFC 不可用 | NFC 配置不匹配 | 中 |
+| `fix.modem` | 信号丢失 | modem 配置不匹配 | 高 |
 
 ---
 
 ## 📱 机型专属配置
 
-| Actions 输入 | 说明 | 示例 |
+| config 路径 | 说明 | 示例 |
 |---|---|---|
-| `device_model` | 机型标识 | `xiaomi13` |
-| `punch_hole_position` | 挖孔坐标 | `505,29:575,99` |
-| `soc_model` | 芯片平台（留空自动检测） | `sm8650` |
-| `serial_no` | 序列号（留空自动读取） | 空 |
-| `replace_selinux` | 是否替换 SELinux | 新平台建议开 |
-| `patch_first_api_level` | 是否修补 first_api_level | 默认开 |
-| `patch_openid` | 是否修复 OpenID | 默认开 |
+| `device.model` | 机型代号 | `cannon` |
+| `device.system_name` | 系统名 | `ColorOS` |
+| `device.punch_hole_position` | 挖孔坐标 | `505,29:575,99` |
+| `device.soc_model` | 芯片平台 | `mt6853` |
+| `device.serial_no` | 序列号 | 空 |
 
 ### 挖孔坐标怎么测
 
@@ -141,15 +189,15 @@
 
 ## 📤 上传方式
 
-上传方式是**独立勾选框**，可以多选。
+在 `config.yml` 里配置：
 
-| 勾选项 | 说明 | 需要 Secrets | 单文件限制 |
+| config 开关 | 说明 | 需要 Secrets | 单文件限制 |
 |---|---|---|---|
-| `upload_pan123` | 123 网盘（**默认**） | ✅ | 100GB+ |
-| `upload_release` | GitHub Release | ❌ | ≤2GB |
-| `upload_r2` | Cloudflare R2 | ✅ | 无限制 |
-| `upload_alist` | Alist | ✅ | 取决于后端 |
-| `upload_artifact` | GitHub Artifact | ❌ | 无，7天过期 |
+| `upload.pan123` | 123 网盘（默认） | ✅ | 100GB+ |
+| `upload.release` | GitHub Release | ❌ | ≤2GB |
+| `upload.r2` | Cloudflare R2 | ✅ | 无限制 |
+| `upload.alist` | Alist | ✅ | 取决于后端 |
+| `upload.artifact` | GitHub Artifact | ❌ | 7 天过期 |
 
 ### 123 网盘配置
 
@@ -158,9 +206,8 @@
 3. 在仓库 **Settings → Secrets → Actions** 配置：
    - `PAN123_CLIENT_ID`
    - `PAN123_CLIENT_SECRET`
-4. 或在 Actions 输入框里直接填（临时测试用）
 
-### 其他网盘配置
+### 其他网盘 Secrets
 
 **Cloudflare R2**：
 - `R2_ACCESS_KEY`
@@ -179,8 +226,6 @@
 
 ### 默认方案：KernelSU Next
 
-工作流默认集成 **KernelSU Next**，支持 4.4 到 6.6 内核。
-
 | 内核版本 | 集成方式 |
 |---|---|
 | 4.14 / 4.19 | 手动打 5 个补丁 |
@@ -188,12 +233,7 @@
 
 ### 回退机制
 
-如果 KernelSU Next 失败，自动回退到原版 KernelSU：
-
-- 4.14 / 4.19：锁 `v0.9.5`
-- 5.10+ GKI：用最新版
-
-两次都失败时，内核不带 Root，但移植流程继续。
+KernelSU Next 失败 → 自动回退原版 KernelSU（4.14/4.19 锁 `v0.9.5`）。
 
 ### 4.14 手动补丁
 
@@ -204,6 +244,18 @@
 | 3 | `fs/read_write.c` | 拦截文件读取 |
 | 4 | `fs/stat.c` | 拦截文件状态查询 |
 | 5 | `include/linux/sched.h` | 加 `ksu_flags` 字段 |
+
+---
+
+## 🔧 MTK BPF 补丁
+
+MTK 在 4.14 内核里引入的一个 BPF 提交有缺陷，会导致 Android 12+ 网络问题。
+
+工作流自动应用 `mtk-bpf-patcher`，在编译内核后、打包前执行。
+
+| config 开关 | 说明 |
+|---|---|
+| `kernel_patch.enable_bpf` | `true` 时自动打补丁 |
 
 ---
 
@@ -263,7 +315,7 @@ ls kernel_src/out/arch/arm64/boot/
 |---|---|
 | `download.sh` | 下载底包和 ColorOS |
 | `unpack.sh` | 解包 payload/super/EROFS |
-| `analyze-kernel.sh` | 分析内核配置，确定 EROFS/LZ4 能力 |
+| `analyze-kernel.sh` | 分析内核配置 |
 | `integrate-root.sh` | 集成 KernelSU Next，失败回退原版 |
 | `build-kernel.sh` | 编译内核，失败自动回退 |
 | `merge-partitions.sh` | 合并 my 分区、补 system_ext |
@@ -276,6 +328,9 @@ ls kernel_src/out/arch/arm64/boot/
 | `verify.sh` | 验证镜像合法性 |
 | `analyze-and-fix.sh` | 日志分析 + 自动修复 |
 | `rollback-fix.sh` | 回滚修复 |
+| `patch-gsi.sh` | 修补 GSI |
+| `build-gsi.sh` | 构建 GSI |
+| `patch-bpf.sh` | MTK BPF 补丁 |
 | `upload-pan123.sh` | 上传到 123 网盘 |
 | `upload-r2.sh` | 上传到 Cloudflare R2 |
 | `upload-alist.sh` | 上传到 Alist |
@@ -288,14 +343,6 @@ ls kernel_src/out/arch/arm64/boot/
 
 勾选了对应上传方式但没配 Secrets，脚本会输出提示并跳过，不会报错。
 
-### Q: 输入项和 Secrets 哪个优先？
-
-**输入项优先**。输入项填了就用输入项，留空则回退到 Secrets。
-
-### Q: 输入项安全吗？
-
-**不安全**。输入项会记录在 Actions 运行日志里，公开仓库建议用 Secrets。
-
 ### Q: 编译内核需要多久？
 
 4.14 内核首次编译约 20-40 分钟。工作流超时设为 300 分钟。
@@ -304,24 +351,30 @@ ls kernel_src/out/arch/arm64/boot/
 
 不能。Root 集成必须有内核源码，没源码时自动跳过。
 
-### Q: 挖孔坐标填错了会怎样？
-
-流体云位置会偏，但不影响开机。用开发者选项「指针位置」实测。
-
 ### Q: 精简了输入法会怎样？
 
-**开机后无法输入**。强烈建议保持 `debloat_ime` 为 `false`。
-
-### Q: 上传到 123 网盘失败怎么办？
-
-检查：
-1. `PAN123_CLIENT_ID` 和 `PAN123_CLIENT_SECRET` 是否正确
-2. 123 账号是否已实名认证
-3. 日志里有没有 `signature error`
+**开机后无法输入**。强烈建议保持 `debloat.ime` 为 `false`。
 
 ### Q: 怎么切换上传到 Release？
 
-在 Actions 里勾 `upload_release`，取消 `upload_pan123` 即可。Release 无需配置。
+在 `config.yml` 里把 `upload.release` 改成 `true`，`upload.pan123` 改成 `false`。
+
+### Q: MTK BPF 补丁失败会怎样？
+
+自动回退到原内核，工作流不会中断，但 Android 12+ 可能出现网络问题。
+
+### Q: 产物命名规则是什么？
+
+```
+<机型代号>-<系统名>-<安卓版本>-<日期>.<后缀>
+```
+
+示例：
+```
+cannon-ColorOS-A15-260912.zip
+cannon-GSI-A15-260912-system.img
+cannon-ColorOS-A15-260912-kernel-ksu-bpf.img
+```
 
 ---
 
