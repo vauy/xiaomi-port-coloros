@@ -1,0 +1,162 @@
+name: Patch GSI (Universal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      # ===== GSI 镜像 =====
+      gsi_url:
+        description: 'GSI 镜像直链（system.img）'
+        required: true
+      gsi_type:
+        description: 'GSI 格式'
+        type: choice
+        options: [auto, ext4, erofs, sparse]
+        default: 'auto'
+
+      # ===== 机型分区类型 =====
+      partition_type:
+        description: '机型分区类型'
+        type: choice
+        options: [a-only, a-b]
+        default: 'a-only'
+
+      # ===== 设备树 =====
+      device_tree_repo:
+        description: '设备树仓库地址'
+        required: true
+        default: 'https://github.com/xiaomi-mt6853-devs/android_device_xiaomi_cannon'
+
+      # ===== 内核源码 =====
+      kernel_source_repo:
+        description: '内核源码仓库地址'
+        required: true
+        default: 'https://github.com/vauy/android_kernel_xiaomi_cannon'
+      kernel_branch:
+        description: '内核分支'
+        required: false
+        default: 'lineage-20'
+      defconfig_name:
+        description: 'defconfig 名'
+        required: true
+        default: 'cannon_defconfig'
+
+      # ===== 注入选项 =====
+      inject_features:
+        description: '注入 device_features'
+        type: boolean
+        default: true
+      inject_display:
+        description: '注入 displayconfig'
+        type: boolean
+        default: true
+      inject_init:
+        description: '注入 init.rc'
+        type: boolean
+        default: true
+      inject_media:
+        description: '注入媒体配置'
+        type: boolean
+        default: true
+      inject_permissions:
+        description: '注入权限白名单'
+        type: boolean
+        default: true
+
+      # ===== 输出选项 =====
+      output_format:
+        description: '输出格式'
+        type: choice
+        options: [img, zip, both]
+        default: 'both'
+
+      # ===== 上传 =====
+      upload_pan123:
+        description: '上传到 123 网盘'
+        type: boolean
+        default: true
+      upload_artifact:
+        description: '上传到 Artifact'
+        type: boolean
+        default: false
+      pan123_client_id:
+        description: '123 Client ID（留空用 Secrets）'
+        required: false
+        default: ''
+      pan123_client_secret:
+        description: '123 Client Secret（留空用 Secrets）'
+        required: false
+        default: ''
+
+jobs:
+  patch:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: |
+          sudo apt update
+          sudo apt install -y python3 python3-pip unzip zip aria2 \
+            android-sdk-libsparse-utils erofs-utils simg2img img2simg \
+            brotli lz4 xz-utils e2fsprogs
+          pip3 install protobuf
+
+      - name: 下载 GSI 镜像
+        run: |
+          mkdir -p work/gsi
+          aria2c -x16 -s16 --file-allocation=none "${{ inputs.gsi_url }}" -o work/gsi/system.img
+
+      - name: 克隆设备树
+        run: |
+          mkdir -p work
+          cd work
+          git clone --depth=1 "${{ inputs.device_tree_repo }}" device_tree 2>/dev/null || true
+
+      - name: 克隆内核源码
+        run: |
+          cd work
+          git clone --depth=1 -b "${{ inputs.kernel_branch }}" \
+            "${{ inputs.kernel_source_repo }}" kernel_src 2>/dev/null || true
+
+      - name: 修补 GSI
+        env:
+          GSI_IMG: gsi/system.img
+          GSI_TYPE: ${{ inputs.gsi_type }}
+          PARTITION_TYPE: ${{ inputs.partition_type }}
+          DEVICE_TREE_REPO: ${{ inputs.device_tree_repo }}
+          KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+          INJECT_FEATURES: ${{ inputs.inject_features }}
+          INJECT_DISPLAY: ${{ inputs.inject_display }}
+          INJECT_INIT: ${{ inputs.inject_init }}
+          INJECT_MEDIA: ${{ inputs.inject_media }}
+          INJECT_PERMISSIONS: ${{ inputs.inject_permissions }}
+          OUTPUT_FORMAT: ${{ inputs.output_format }}
+        run: bash scripts/patch-gsi.sh
+
+      - name: 验证产物
+        run: |
+          echo ">>> 产物列表"
+          ls -lh work/gsi/
+          for f in work/gsi/*.img work/gsi/*.zip; do
+            [ -f "$f" ] && file "$f"
+          done
+
+      - name: 上传到 123 网盘
+        if: inputs.upload_pan123
+        env:
+          PAN123_CLIENT_ID: ${{ inputs.pan123_client_id || secrets.PAN123_CLIENT_ID }}
+          PAN123_CLIENT_SECRET: ${{ inputs.pan123_client_secret || secrets.PAN123_CLIENT_SECRET }}
+        run: bash scripts/upload-pan123.sh
+
+      - name: 上传到 Artifact
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: patched-gsi
+          path: |
+            work/gsi/*.img
+            work/gsi/*.zip
+          retention-days: 7
