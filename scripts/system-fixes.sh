@@ -38,4 +38,31 @@ if [ "${FIX_HDR:-false}" = "true" ]; then
   find coloros/my_product/etc -iname "*hdr*" -delete 2>/dev/null || true
 fi
 
-if [
+if [ "${FIX_WECHAT_SCAN:-false}" = "true" ]; then
+  rm -f coloros/system_ext/etc/sys_camera_optimize_config.xml
+  rm -f coloros/my_product/etc/sys_camera_optimize_config.xml
+fi
+
+if [ "${FIX_WALLPAPER:-false}" = "true" ]; then
+  rm -rf coloros/my_product/app/Wallpaper coloros/my_product/priv-app/Wallpaper
+fi
+
+if [ "${FIX_COLOR_TEMP:-false}" = "true" ]; then
+  find coloros -iname "*color*temp*" -o -iname "*display*color*" 2>/dev/null | while read -r f; do
+    base_f="base/${f#coloros/}"
+    [ -f "$base_f" ] && cp "$base_f" "$f"
+  done
+fi
+
+if [ "${FIX_NFC:-false}" = "true" ]; then
+  find base/vendor/etc -name "*nfc*" 2>/dev/null | while read -r f; do
+    cp "$f" coloros/vendor/etc/ 2>/dev/null || true
+  done
+fi
+
+if [ "${FIX_MODEM:-false}" = "true" ]; then
+  [ -d "base/modem" ] && rm -rf coloros/modem && cp -a base/modem coloros/modem
+  find base/vendor/lib64 -name "libril*" 2>/dev/null | while read -r f; do
+    cp "$f" coloros/vendor/lib64/ 2>/dev/null || true
+  done
+fi
