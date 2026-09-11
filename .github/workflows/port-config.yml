@@ -1,280 +1,91 @@
 # ============================================================
 # ColorOS 移植配置
 # ============================================================
-# 说明：
-#   - 改完提交即可，工作流自动读取
-#   - 必填项（底包、ColorOS 包、内核源码、设备树）在 Actions 界面填写
-# ============================================================
 
-# ============================================================
-# 设备信息
-# ============================================================
 device:
-  # 机型代号（用于产物命名）
+  # 机型代号
   model: "cannon"
-
-  # 系统名（用于产物命名）
+  # 系统名
   system_name: "ColorOS"
-
   # 挖孔坐标（留空跳过）
-  # 格式：左x,上y:右x,下y
-  # 示例：505,29:575,99
-  # 测量方法：开发者选项 → 指针位置，点挖孔左上角和右下角
   punch_hole_position: ""
-
   # 芯片平台（留空自动检测）
-  # 示例：sm8650、mt6853
   soc_model: ""
-
-  # 序列号（留空自动从底包读取）
+  # 序列号（留空自动读取）
   serial_no: ""
 
-# ============================================================
-# 内核 Root
-# ============================================================
 root:
   # 是否集成 KernelSU
-  # true = 编译带 Root 的内核
-  # false = 跳过 Root 集成
   enable: true
-
-  # Root 方案
-  # kernelsu-next = KernelSU Next（推荐，支持 4.4+）
-  # kernelsu      = 原版 KernelSU（4.14/4.19 锁 v0.9.5）
+  # Root 方案：kernelsu-next / kernelsu
   type: "kernelsu-next"
-
   # KernelSU 版本（留空用最新）
-  # 示例：v1.0.0
   version: ""
 
-# ============================================================
-# 内核补丁
-# ============================================================
 kernel_patch:
-  # MTK BPF 补丁
-  # 4.14 / 4.19 内核必开
-  # 解决 MTK 内核在 Android 12+ 上的网络问题
-  # 症状：无网络、WiFi/数据开关失效
+  # MTK BPF 补丁（4.14/4.19 必开）
   enable_bpf: true
 
-# ============================================================
-# 打包
-# ============================================================
 pack:
-  # 打包模式
-  # zip   = 只出卡刷包
-  # super = 只出 super.img
-  # both  = 两个都出（推荐）
+  # 打包模式：zip / super / both
   mode: "both"
-
   # super 分区大小（字节）
-  # 默认 8GB，按机型调整
-  # 如果 lpmake 报错 "size too large"，调大这个值
   super_size: "8589934592"
 
-# ============================================================
-# 精简 APP
-# ============================================================
-# true = 删除，false = 保留
-# 风险等级说明：
-#   低   = 可安全删除
-#   中   = 删后可能影响部分功能
-#   高   = 删后系统功能受损
-#   极高 = 删后基本功能不可用
-# ============================================================
 debloat:
-  # ---- 低风险 ----
-  # 广告服务（com.oplus.ad）
-  # 删后系统级广告消失
   ad: true
-
-  # OPPO 软件商店（com.heytap.market）
-  # 删后无法从官方商店更新应用
   app_market: true
-
-  # 游戏中心（com.oplus.gamecenter）
   game_center: true
-
-  # 自带浏览器（com.heytap.browser）
-  # 删后可用 Chrome/Via 替代
   browser: true
-
-  # 内容推荐服务（com.oplus.content）
-  # 删后负一屏可能变空白
   content_ext: true
-
-  # 主题商店（com.heytap.themestore）
-  # 删后无法下载主题
   theme_store: true
-
-  # 小布语音助手（com.oplus.voiceassistant）
   voice_assistant: true
-
-  # 自带音乐（com.oplus.music）
   music: true
-
-  # 自带视频（com.oplus.video）
   video: true
-
-  # 用户反馈（com.oplus.feedback）
   feedback: true
-
-  # ---- 中风险 ----
-  # OTA 更新服务（com.oplus.ota）
-  # 删后无法接收官方更新
   ota: true
-
-  # OPPO 推送服务（com.oplus.push）
-  # 删后 ColorOS 应用收不到推送
   push: false
-
-  # 动态壁纸（com.oplus.wallpaper）
-  # 删后实况壁纸黑屏
   wallpaper: false
-
-  # 相册（com.oplus.gallery）
-  # 删后部分系统功能依赖
   gallery: false
-
-  # ---- 高风险 ----
-  # 云服务（com.oplus.cloud）
-  # 删后无法云同步
   cloud: false
-
-  # 账号服务（com.oplus.account）
-  # 删后账号相关崩溃
   account: false
-
-  # ---- 极高风险 ----
-  # 自带输入法（com.oplus.ime）
-  # ⚠️ 删后开机无法打字，必须提前装好第三方输入法
   ime: false
-
-  # 相机（com.oplus.camera）
-  # ⚠️ 删后相机完全不可用，与 HAL 深度绑定
   camera: false
 
-# ============================================================
-# 替换默认应用
-# ============================================================
 replace:
-  # 浏览器 → Via
-  # 风险：低
   browser:
     enable: true
     url: "https://github.com/viayoo/ViaBrowser/releases/latest/download/ViaBrowser.apk"
     package: "mark.via"
-
-  # 相册 → Simple Gallery
-  # 风险：中，部分系统功能依赖 ColorOS 相册
   gallery:
     enable: false
     url: "https://github.com/SimpleMobileTools/Simple-Gallery/releases/latest/download/SimpleGallery.apk"
     package: "com.simplemobiletools.gallery.pro"
-
-  # 文件管理 → Material Files
-  # 风险：低
   file_manager:
     enable: false
     url: "https://github.com/zhanghai/MaterialFiles/releases/latest/download/MaterialFiles.apk"
     package: "me.zhanghai.android.files"
 
-# ============================================================
-# 系统级修复
-# ============================================================
-# true = 启用修复，false = 跳过
-# ============================================================
 fix:
-  # OpenID/OUID 卡顿
-  # 根因：缺 OPlus 序列号属性
-  # 症状：酷安、应用商店等卡顿
-  # 修复：补 vendor.gsm.serial / gsm.serial
   openid: false
-
-  # SELinux 拒绝
-  # 根因：sepolicy 与小米内核不匹配
-  # 修复：替换整个 SELinux 文件夹
-  # 注意：高通新平台（sm8650+）建议开
   selinux: false
-
-  # 音频炸裂
-  # 根因：音频策略与小米 HAL 不兼容
-  # 修复：删除 audio_policy_configuration.xml
   audio: false
-
-  # 振动异常
-  # 根因：权限段与小米马达不匹配
-  # 修复：删除 lmvibrator / richctap 权限段
   vibrator: false
-
-  # 抖音卡顿（HDR）
-  # 根因：HDR 特性文件与小米显示不兼容
-  # 修复：删除 HDR 特性文件
   hdr: false
-
-  # 微信扫一扫
-  # 根因：相机优化配置与小米相机 HAL 冲突
-  # 修复：删除 sys_camera_optimize_config.xml
   wechat_scan: false
-
-  # 实况壁纸黑屏
-  # 根因：动态壁纸服务与小米 GPU 不兼容
-  # 修复：删除动态壁纸服务
   wallpaper: false
-
-  # 屏幕色温异常
-  # 根因：色温曲线与小米屏幕不匹配
-  # 修复：替换色温配置文件
   color_temp: false
-
-  # NFC 不可用
-  # 根因：NFC 配置与小米 NFC 芯片不匹配
-  # 修复：替换 NFC 配置
   nfc: false
-
-  # 信号丢失
-  # 根因：modem 配置与小米基带不匹配
-  # 修复：保留底包 modem 分区
-  # 注意：风险较高，慎用
   modem: false
 
-# ============================================================
-# 机型补丁
-# ============================================================
 patch:
-  # 替换 SELinux
-  # 新平台（小米 15 及以后）建议开
   replace_selinux: false
-
-  # 修补 first_api_level
-  # 卡二屏时开，默认开
   first_api_level: true
-
-  # 修复 OpenID/OUID
-  # 与 fix.openid 功能重叠，建议只开一个
   openid: true
 
-# ============================================================
-# 上传方式
-# ============================================================
-# true = 上传，false = 跳过
-# Secrets 仍需在仓库里配置
-# ============================================================
 upload:
-  # 123 网盘（推荐，国内快）
-  # 需要 Secrets：PAN123_CLIENT_ID、PAN123_CLIENT_SECRET
   pan123: true
-
-  # GitHub Release（无需配置，单文件≤2GB）
   release: false
-
-  # Cloudflare R2（大文件推荐）
-  # 需要 Secrets：R2_ACCESS_KEY、R2_SECRET_KEY、R2_ENDPOINT、R2_BUCKET
   r2: false
-
-  # Alist（需自建服务）
-  # 需要 Secrets：ALIST_URL、ALIST_TOKEN、ALIST_PATH
   alist: false
-
-  # GitHub Artifact（7天过期，备份用）
   artifact: false
