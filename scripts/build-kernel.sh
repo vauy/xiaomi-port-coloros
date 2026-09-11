@@ -6,10 +6,13 @@ cd work
 
 mkdir -p verify
 
-# ============================================================
-# 编译内核
-# 自动探测产物名：Image.lz4-dtb / Image.gz-dtb / Image-dtb / Image
-# ============================================================
+# 命名参数
+DEVICE="${DEVICE_MODEL:-cannon}"
+SYSTEM_NAME="${SYSTEM_NAME:-ColorOS}"
+ANDROID_VER="${ANDROID_VER:-15}"
+ANDROID_TAG="A${ANDROID_VER}"
+DATE_TAG=$(date +%y%m%d)
+
 compile_kernel() {
   local log=$1
   cd kernel_src
@@ -18,23 +21,17 @@ compile_kernel() {
   export SUBARCH=arm64
   export CROSS_COMPILE=aarch64-linux-gnu-
 
-  # 安装工具链
   if ! command -v aarch64-linux-gnu-gcc > /dev/null 2>&1; then
     sudo apt install -y gcc-aarch64-linux-gnu
   fi
-
-  # 安装 mkimage（联发科内核常用）
   if ! command -v mkimage > /dev/null 2>&1; then
     sudo apt install -y u-boot-tools
   fi
 
-  # 生成 .config
   make O=out ARCH=arm64 "${DEFCONFIG_NAME}" 2>&1 | tee "../verify/${log}"
 
-  # 自动探测产物名
   local target=""
   for t in Image.lz4-dtb Image.gz-dtb Image-dtb Image; do
-    echo ">>> 尝试编译目标: $t"
     if make -j$(nproc) O=out ARCH=arm64 \
         CROSS_COMPILE=aarch64-linux-gnu- "$t" 2>&1 | tee -a "../verify/${log}"; then
       if [ -f "out/arch/arm64/boot/$t" ]; then
@@ -49,15 +46,10 @@ compile_kernel() {
     echo "KERNEL_TARGET=$target" >> "$GITHUB_ENV"
     return 0
   fi
-
-  echo "  ✗ 未找到任何内核产物"
   cd ..
   return 1
 }
 
-# ============================================================
-# 第一次编译
-# ============================================================
 if compile_kernel "build.log"; then
   echo "KERNEL_BUILT=true" >> "$GITHUB_ENV"
 else
@@ -67,10 +59,7 @@ else
   FALLBACK_TYPE="kernelsu"
   [ "${ROOT_TYPE:-kernelsu-next}" = "kernelsu" ] && FALLBACK_TYPE="kernelsu-next"
 
-  export ENABLE_ROOT=true
-  export ROOT_TYPE="$FALLBACK_TYPE"
-  export DEFCONFIG_NAME="$DEFCONFIG_NAME"
-  export KERNEL_SOURCE_REPO="$KERNEL_SOURCE_REPO"
+  export ENABLE_ROOT=true ROOT_TYPE="$FALLBACK_TYPE" DEFCONFIG_NAME="$DEFCONFIG_NAME" KERNEL_SOURCE_REPO="$KERNEL_SOURCE_REPO"
 
   bash scripts/integrate-root.sh || {
     echo "KERNEL_BUILT=false" >> "$GITHUB_ENV"
@@ -90,7 +79,6 @@ fi
 
 # ============================================================
 # 应用 MTK BPF 补丁
-# 解决 MTK 4.14 内核在 Android 12+ 上的网络问题
 # ============================================================
 echo ">>> 应用 MTK BPF 补丁"
 
@@ -102,20 +90,13 @@ if [ ! -f "$KERNEL_SRC" ]; then
   exit 1
 fi
 
-# 下载 mtk-bpf-patcher
 BPF_PATCHER="mtk-bpf-patcher"
 if [ ! -f "$BPF_PATCHER" ]; then
-  echo ">>> 下载 mtk-bpf-patcher"
-  curl -LSs "https://github.com/R0rt1z2/mtk-bpf-patcher/releases/latest/download/mtk-bpf-patcher" \
-    -o "$BPF_PATCHER" 2>/dev/null || true
-
-  # 如果 release 下载失败，从源码编译
-  if [ ! -f "$BPF_PATCHER" ] || [ ! -s "$BPF_PATCHER" ]; then
-    echo ">>> Release 下载失败，从源码编译"
+  curl -LSs "https://github.com/R0rt1z2/mtk-bpf-patcher/releases/latest/download/mtk-bpf-patcher" -o "$BPF_PATCHER" 2>/dev/null || true
+  if [ ! -s "$BPF_PATCHER" ]; then
     git clone --depth=1 https://github.com/R0rt1z2/mtk-bpf-patcher.git 2>/dev/null || true
     if [ -d "mtk-bpf-patcher" ]; then
       cd mtk-bpf-patcher
-      # 如果是 Rust 项目
       if [ -f "Cargo.toml" ]; then
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null || true
         source "$HOME/.cargo/env" 2>/dev/null || true
@@ -125,27 +106,36 @@ if [ ! -f "$BPF_PATCHER" ]; then
       cd ..
     fi
   fi
-
   chmod +x "$BPF_PATCHER" 2>/dev/null || true
 fi
 
-# 应用补丁
 mkdir -p base_boot
+
+# 根据是否带 Root 和 BPF 决定后缀
+KERNEL_SUFFIX=""
+[ "${ROOT_INTEGRATED:-false}" = "true" ] && KERNEL_SUFFIX="${KERNEL_SUFFIX}-ksu"
+
 if [ -f "$BPF_PATCHER" ] && [ -x "$BPF_PATCHER" ]; then
-  echo ">>> 执行 BPF 补丁"
-  if "./$BPF_PATCHER" "$KERNEL_SRC" "base_boot/kernel"; then
+  if "./$BPF_PATCHER" "$KERNEL_SRC" "base_boot/temp_kernel"; then
     echo ">>> BPF 补丁成功"
     echo "BPF_PATCHED=true" >> "$GITHUB_ENV"
+    KERNEL_SUFFIX="${KERNEL_SUFFIX}-bpf"
+    mv "base_boot/temp_kernel" "base_boot/kernel"
   else
-    echo ">>> BPF 补丁失败，使用原内核"
-    cp "$KERNEL_SRC" "base_boot/kernel"
+    echo ">>> BPF 补丁失败"
     echo "BPF_PATCHED=false" >> "$GITHUB_ENV"
+    cp "$KERNEL_SRC" "base_boot/kernel"
   fi
 else
-  echo ">>> 警告: mtk-bpf-patcher 不可用，使用原内核"
-  cp "$KERNEL_SRC" "base_boot/kernel"
+  echo ">>> mtk-bpf-patcher 不可用"
   echo "BPF_PATCHED=false" >> "$GITHUB_ENV"
+  cp "$KERNEL_SRC" "base_boot/kernel"
 fi
+
+# 命名内核产物
+KERNEL_NAME="${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}-kernel${KERNEL_SUFFIX}.img"
+cp "base_boot/kernel" "base_boot/$KERNEL_NAME"
+echo ">>> 内核: base_boot/$KERNEL_NAME"
 
 echo ">>> 内核处理完成"
 ls -lh base_boot/
