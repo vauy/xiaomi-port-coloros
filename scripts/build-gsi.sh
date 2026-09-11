@@ -5,11 +5,14 @@ cd work
 # ============================================================
 # GSI 构建脚本
 # 用法：build-gsi.sh [kernel|gsi]
-#   kernel - 编译内核
-#   gsi    - 注入配置并构建 GSI
 # ============================================================
 
 MODE="${1:-gsi}"
+
+# 命名参数
+DEVICE="${DEVICE_MODEL:-cannon}"
+SYSTEM_NAME="${SYSTEM_NAME:-GSI}"
+DATE_TAG=$(date +%y%m%d)
 
 # ============================================================
 # 模式一：编译内核
@@ -23,20 +26,15 @@ if [ "$MODE" = "kernel" ]; then
   export SUBARCH=arm64
   export CROSS_COMPILE=aarch64-linux-gnu-
 
-  # 安装工具链
   if ! command -v aarch64-linux-gnu-gcc > /dev/null 2>&1; then
     sudo apt install -y gcc-aarch64-linux-gnu
   fi
-
-  # 安装 mkimage（联发科内核常用）
   if ! command -v mkimage > /dev/null 2>&1; then
     sudo apt install -y u-boot-tools
   fi
 
-  # 生成 .config
   make O=out ARCH=arm64 "${DEFCONFIG_NAME}" 2>&1 | tee ../verify/kernel-build.log
 
-  # 自动探测产物名
   local target=""
   for t in Image.lz4-dtb Image.gz-dtb Image-dtb Image; do
     echo ">>> 尝试编译目标: $t"
@@ -51,7 +49,7 @@ if [ "$MODE" = "kernel" ]; then
 
   if [ -n "$target" ]; then
     mkdir -p ../gsi
-    cp "out/arch/arm64/boot/$target" "../gsi/kernel-$target"
+    cp "out/arch/arm64/boot/$target" "../gsi/${DEVICE}-${SYSTEM_NAME}-kernel-$target"
     echo ">>> 内核编译成功: $target"
   else
     echo ">>> 内核编译失败"
@@ -75,7 +73,6 @@ WORK_DIR="gsi_work"
 mkdir -p "$WORK_DIR"
 mkdir -p gsi
 
-# ---- 检查 GSI 镜像 ----
 if [ ! -f "$GSI_IMG" ]; then
   echo ">>> 错误: 找不到 GSI 镜像 $GSI_IMG"
   exit 1
@@ -86,9 +83,7 @@ file "$GSI_IMG"
 
 # ---- 解包 GSI ----
 echo ">>> 解包 GSI"
-
 IMG="$GSI_IMG"
-
 if file "$GSI_IMG" | grep -q "Android sparse"; then
   simg2img "$GSI_IMG" "$WORK_DIR/gsi_raw.img"
   IMG="$WORK_DIR/gsi_raw.img"
@@ -115,14 +110,13 @@ else
   fi
 fi
 
-# ---- 查找 etc 目录 ----
+# ---- 查找 etc ----
 find_etc_dir() {
   for d in system/etc system_ext/etc product/etc; do
     [ -d "$TARGET_DIR/$d" ] && echo "$TARGET_DIR/$d" && return 0
   done
   return 1
 }
-
 ETC_DIR=$(find_etc_dir)
 if [ -z "$ETC_DIR" ]; then
   echo ">>> 错误: 找不到 etc 目录"
@@ -181,9 +175,8 @@ if [ "$MOUNTED" = "true" ]; then
   sudo umount "$WORK_DIR/gsi_mnt" 2>/dev/null || true
 fi
 
-# ---- 重新打包镜像 ----
+# ---- 重新打包 ----
 echo ">>> 重新打包镜像"
-
 if [ "$MOUNTED" = "false" ]; then
   EXTRACT_DIR="$TARGET_DIR"
   if file "$IMG" | grep -q "EROFS"; then
@@ -194,6 +187,11 @@ if [ "$MOUNTED" = "false" ]; then
   fi
   echo "    ✓ gsi/patched_system.img"
 fi
+
+# ---- 读取安卓版本 ----
+ANDROID_VER=$(strings "$GSI_IMG" 2>/dev/null | grep -m1 'ro.build.version.release=' | cut -d= -f2)
+[ -z "$ANDROID_VER" ] && ANDROID_VER="15"
+ANDROID_TAG="A${ANDROID_VER}"
 
 # ---- 打包卡刷包 ----
 if [ "${OUTPUT_FORMAT:-both}" = "zip" ] || [ "${OUTPUT_FORMAT:-both}" = "both" ]; then
@@ -227,10 +225,19 @@ unzip -o "$ZIPFILE" 'META-INF/com/google/android/updater-script' -d /tmp > /dev/
 EOF
   chmod +x "$ZIP_DIR/META-INF/com/google/android/update-binary"
 
+  ZIP_NAME="${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}.zip"
+
   cd "$ZIP_DIR"
-  zip -r "../gsi/GSI-build-${PARTITION_TYPE}.zip" . 2>/dev/null
+  zip -r "../gsi/$ZIP_NAME" . 2>/dev/null
   cd ..
-  echo "    ✓ gsi/GSI-build-${PARTITION_TYPE}.zip"
+  echo "    ✓ gsi/$ZIP_NAME"
+fi
+
+# ---- 重命名 img ----
+IMG_NAME="${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}-system.img"
+if [ -f "gsi/patched_system.img" ]; then
+  cp "gsi/patched_system.img" "gsi/$IMG_NAME"
+  echo "    ✓ gsi/$IMG_NAME"
 fi
 
 # ---- 汇总 ----
@@ -240,7 +247,7 @@ ls -lh gsi/
 echo ""
 echo "刷入命令："
 if [ "$PARTITION_TYPE" = "a-b" ]; then
-  echo "  fastboot flash system_a gsi/patched_system.img"
+  echo "  fastboot flash system_a gsi/$IMG_NAME"
 else
-  echo "  fastboot flash system gsi/patched_system.img"
+  echo "  fastboot flash system gsi/$IMG_NAME"
 fi
