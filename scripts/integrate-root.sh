@@ -10,10 +10,15 @@ cd work
 
 cd kernel_src
 KERNEL_VERSION=$(make -s kernelversion 2>/dev/null | cut -d. -f1,2 || echo "unknown")
+echo ">>> 内核版本: $KERNEL_VERSION"
 
+# ============================================================
+# 手动打补丁（4.14 / 4.19）
+# ============================================================
 apply_manual_patches() {
   local ksu_dir=$1
 
+  # 补丁 1：fs/exec.c
   if ! grep -q "ksu_handle_execve" fs/exec.c 2>/dev/null; then
     python3 -c "
 import re
@@ -27,6 +32,7 @@ with open('fs/exec.c','w') as f: f.write(c)
 "
   fi
 
+  # 补丁 2：fs/open.c
   if ! grep -q "ksu_handle_faccessat" fs/open.c 2>/dev/null; then
     python3 -c "
 import re
@@ -40,6 +46,7 @@ with open('fs/open.c','w') as f: f.write(c)
 "
   fi
 
+  # 补丁 3：fs/read_write.c
   if ! grep -q "ksu_handle_vfs_read" fs/read_write.c 2>/dev/null; then
     python3 -c "
 import re
@@ -54,6 +61,7 @@ with open('fs/read_write.c','w') as f: f.write(c)
 "
   fi
 
+  # 补丁 4：fs/stat.c
   if ! grep -q "ksu_handle_vfs_stat" fs/stat.c 2>/dev/null; then
     python3 -c "
 import re
@@ -67,6 +75,7 @@ with open('fs/stat.c','w') as f: f.write(c)
 "
   fi
 
+  # 补丁 5：include/linux/sched.h
   if ! grep -q "ksu_flags" include/linux/sched.h 2>/dev/null; then
     python3 -c "
 import re
@@ -80,13 +89,21 @@ with open('include/linux/sched.h','w') as f: f.write(c)
   fi
 }
 
+# ============================================================
+# 接入 Kbuild
+# ============================================================
 setup_kbuild() {
   local ksu_dir=$1
-  grep -q "$ksu_dir" drivers/Makefile 2>/dev/null || echo "obj-\$(CONFIG_KSU) += ${ksu_dir}/kernel/" >> drivers/Makefile
-  grep -q "$ksu_dir" drivers/Kconfig 2>/dev/null || echo "source \"drivers/${ksu_dir}/Kconfig\"" >> drivers/Kconfig
+  grep -q "$ksu_dir" drivers/Makefile 2>/dev/null || \
+    echo "obj-\$(CONFIG_KSU) += ${ksu_dir}/kernel/" >> drivers/Makefile
+  grep -q "$ksu_dir" drivers/Kconfig 2>/dev/null || \
+    echo "source \"drivers/${ksu_dir}/Kconfig\"" >> drivers/Kconfig
   cp "${ksu_dir}/kernel/Kconfig" "drivers/${ksu_dir}/Kconfig" 2>/dev/null || true
 }
 
+# ============================================================
+# 写入 defconfig
+# ============================================================
 write_defconfig() {
   local p="arch/arm64/configs/${DEFCONFIG_NAME}"
   if [ -f "$p" ]; then
@@ -95,35 +112,59 @@ write_defconfig() {
   fi
 }
 
+# ============================================================
+# 方案一：KernelSU Next
+# 支持分支参数，默认 next
+# ============================================================
 try_next() {
   local branch="${ROOT_VERSION:-next}"
-  git clone --depth=1 --branch "$branch" https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next 2>/dev/null || return 1
+  echo ">>> 使用 KernelSU Next (分支: $branch)"
+
+  git clone --depth=1 --branch "$branch" \
+    https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next 2>/dev/null || return 1
+
   [ -f "KernelSU-Next/kernel/ksu.c" ] || return 1
   setup_kbuild "KernelSU-Next"
+
   if [ "$KERNEL_VERSION" = "4.14" ] || [ "$KERNEL_VERSION" = "4.19" ]; then
     apply_manual_patches "KernelSU-Next" || return 1
   else
     curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/${branch}/kernel/setup.sh" | bash -s legacy 2>/dev/null || return 1
   fi
+
   write_defconfig
   return 0
 }
 
+# ============================================================
+# 方案二：原版 KernelSU
+# 4.14 / 4.19 锁 v0.9.5
+# ============================================================
 try_ksu() {
   local version="v0.9.5"
-  git clone --depth=1 --branch "$version" https://github.com/tiann/KernelSU.git KernelSU 2>/dev/null || return 1
+  echo ">>> 使用原版 KernelSU (版本: $version)"
+
+  git clone --depth=1 --branch "$version" \
+    https://github.com/tiann/KernelSU.git KernelSU 2>/dev/null || return 1
+
   [ -f "KernelSU/kernel/ksu.c" ] || return 1
   setup_kbuild "KernelSU"
+
   if [ "$KERNEL_VERSION" = "4.14" ] || [ "$KERNEL_VERSION" = "4.19" ]; then
     apply_manual_patches "KernelSU" || return 1
   else
     curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "$version" 2>/dev/null || return 1
   fi
+
   write_defconfig
   return 0
 }
 
+# ============================================================
+# 主流程
+# ============================================================
 INTEGRATED=false
+
 if [ "${ROOT_TYPE:-kernelsu-next}" = "kernelsu" ]; then
   try_ksu && INTEGRATED=true
 else
