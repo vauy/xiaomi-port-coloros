@@ -272,12 +272,32 @@ jobs:
         run: bash scripts/integrate-root.sh
 
       - name: 编译内核
-        if: inputs.enable_root && env.ROOT_INTEGRATED == 'true'
-        env:
-          ROOT_TYPE: ${{ inputs.root_type }}
-          KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
-          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
-        run: bash scripts/build-kernel.sh
+  if: inputs.enable_root && env.ROOT_INTEGRATED == 'true'
+  env:
+    ROOT_TYPE: ${{ inputs.root_type }}
+    KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+    DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+  run: bash scripts/build-kernel.sh
+
+- name: 输出 BPF 补丁状态
+  if: inputs.enable_root && env.KERNEL_BUILT == 'true'
+  run: |
+    if [ "$BPF_PATCHED" = "true" ]; then
+      echo "## ✓ MTK BPF 补丁已应用" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "内核已修复 MTK 4.14 BPF 问题，可兼容 Android 12+ GSI。" >> $GITHUB_STEP_SUMMARY
+    else
+      echo "## ⚠️ MTK BPF 补丁未应用" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "内核未打 BPF 补丁，Android 12+ 可能出现网络问题。" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "手动修复：" >> $GITHUB_STEP_SUMMARY
+      echo '```bash' >> $GITHUB_STEP_SUMMARY
+      echo "git clone https://github.com/R0rt1z2/mtk-bpf-patcher.git" >> $GITHUB_STEP_SUMMARY
+      echo "cd mtk-bpf-patcher && cargo build --release" >> $GITHUB_STEP_SUMMARY
+      echo "./target/release/mtk-bpf-patcher <输入内核> <输出内核>" >> $GITHUB_STEP_SUMMARY
+      echo '```' >> $GITHUB_STEP_SUMMARY
+    fi
 
       - name: 合并分区
         run: bash scripts/merge-partitions.sh
