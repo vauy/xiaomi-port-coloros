@@ -13,8 +13,12 @@ on:
         description: '内核源码仓库地址（可选）'
         required: false
         default: ''
+      kernel_branch:
+        description: '内核分支（如 lineage-20，留空用默认）'
+        required: false
+        default: ''
       defconfig_name:
-        description: 'defconfig 名（如 xiaomi_defconfig）'
+        description: 'defconfig 名（如 cannon_defconfig）'
         required: false
         default: ''
       enable_root:
@@ -144,9 +148,9 @@ on:
         type: boolean
         default: false
       device_model:
-        description: '机型标识（如 xiaomi13）'
+        description: '机型标识（如 cannon）'
         required: true
-        default: 'xiaomi_xxx'
+        default: 'cannon'
       punch_hole_position:
         description: '挖孔坐标（留空跳过）'
         required: false
@@ -241,7 +245,7 @@ jobs:
           sudo apt update
           sudo apt install -y python3 python3-pip unzip zip aria2 \
             android-sdk-libsparse-utils erofs-utils simg2img img2simg \
-            brotli lz4 xz-utils
+            brotli lz4 xz-utils u-boot-tools
           pip3 install protobuf
 
       - name: 下载固件
@@ -253,6 +257,7 @@ jobs:
       - name: 分析内核配置
         env:
           KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+          KERNEL_BRANCH: ${{ inputs.kernel_branch }}
         run: bash scripts/analyze-kernel.sh
 
       - name: 集成 Root
@@ -262,6 +267,7 @@ jobs:
           ROOT_TYPE: ${{ inputs.root_type }}
           ROOT_VERSION: ${{ inputs.root_version }}
           KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+          KERNEL_BRANCH: ${{ inputs.kernel_branch }}
           DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
         run: bash scripts/integrate-root.sh
 
@@ -269,6 +275,7 @@ jobs:
         if: inputs.enable_root && env.ROOT_INTEGRATED == 'true'
         env:
           ROOT_TYPE: ${{ inputs.root_type }}
+          KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
           DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
         run: bash scripts/build-kernel.sh
 
