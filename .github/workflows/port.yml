@@ -1,4 +1,4 @@
-name: Port ColorOS 16
+name: Port ColorOS
 
 on:
   workflow_dispatch:
@@ -7,230 +7,21 @@ on:
         description: 'MIUI/澎湃底包直链'
         required: true
       coloros_url:
-        description: 'ColorOS 16 移植包直链'
+        description: 'ColorOS 移植包直链'
         required: true
       kernel_source_repo:
-        description: '内核源码仓库地址（可选）'
-        required: false
-        default: ''
-      kernel_branch:
-        description: '内核分支（如 lineage-20，留空用默认）'
-        required: false
-        default: ''
-      defconfig_name:
-        description: 'defconfig 名（如 cannon_defconfig）'
-        required: false
-        default: ''
-      enable_root:
-        description: '是否集成 KernelSU'
-        type: boolean
-        default: true
-      root_type:
-        description: 'Root 方案'
-        type: choice
-        options: [kernelsu-next, kernelsu]
-        default: 'kernelsu-next'
-      root_version:
-        description: 'KernelSU 版本（留空用最新）'
-        required: false
-        default: ''
-      pack_mode:
-        description: '打包模式'
-        type: choice
-        options: [zip, super, both]
-        default: 'both'
-      super_size:
-        description: 'super 分区大小（字节）'
-        default: '8589934592'
-      debloat_ad:
-        description: '精简：广告服务'
-        type: boolean
-        default: true
-      debloat_app_market:
-        description: '精简：OPPO 软件商店'
-        type: boolean
-        default: true
-      debloat_game_center:
-        description: '精简：游戏中心'
-        type: boolean
-        default: true
-      debloat_browser:
-        description: '精简：自带浏览器'
-        type: boolean
-        default: true
-      debloat_content_ext:
-        description: '精简：内容推荐服务'
-        type: boolean
-        default: true
-      debloat_theme_store:
-        description: '精简：主题商店'
-        type: boolean
-        default: true
-      debloat_voice_assistant:
-        description: '精简：小布语音助手'
-        type: boolean
-        default: true
-      debloat_music:
-        description: '精简：自带音乐'
-        type: boolean
-        default: true
-      debloat_video:
-        description: '精简：自带视频'
-        type: boolean
-        default: true
-      debloat_feedback:
-        description: '精简：用户反馈'
-        type: boolean
-        default: true
-      debloat_ota:
-        description: '精简：OTA 更新服务'
-        type: boolean
-        default: true
-      replace_browser:
-        description: '替换：浏览器 → Via'
-        type: boolean
-        default: true
-      replace_browser_url:
-        description: 'Via 浏览器 APK 直链'
-        default: 'https://github.com/viayoo/ViaBrowser/releases/latest/download/ViaBrowser.apk'
-      replace_gallery:
-        description: '替换：相册 → Simple Gallery'
-        type: boolean
-        default: false
-      replace_gallery_url:
-        description: 'Simple Gallery APK 直链'
-        default: 'https://github.com/SimpleMobileTools/Simple-Gallery/releases/latest/download/SimpleGallery.apk'
-      replace_file_manager:
-        description: '替换：文件管理 → Material Files'
-        type: boolean
-        default: false
-      replace_file_manager_url:
-        description: 'Material Files APK 直链'
-        default: 'https://github.com/zhanghai/MaterialFiles/releases/latest/download/MaterialFiles.apk'
-      fix_openid:
-        description: '修复：OpenID/OUID 卡顿'
-        type: boolean
-        default: false
-      fix_selinux:
-        description: '修复：SELinux 拒绝'
-        type: boolean
-        default: false
-      fix_audio:
-        description: '修复：音频炸裂'
-        type: boolean
-        default: false
-      fix_vibrator:
-        description: '修复：振动异常'
-        type: boolean
-        default: false
-      fix_hdr:
-        description: '修复：抖音卡顿（HDR）'
-        type: boolean
-        default: false
-      fix_wechat_scan:
-        description: '修复：微信扫一扫'
-        type: boolean
-        default: false
-      fix_wallpaper:
-        description: '修复：实况壁纸黑屏'
-        type: boolean
-        default: false
-      fix_color_temp:
-        description: '修复：屏幕色温异常'
-        type: boolean
-        default: false
-      fix_nfc:
-        description: '修复：NFC 不可用'
-        type: boolean
-        default: false
-      fix_modem:
-        description: '修复：信号丢失'
-        type: boolean
-        default: false
-      device_model:
-        description: '机型标识（如 cannon）'
+        description: '内核源码仓库地址'
         required: true
-        default: 'cannon'
-      punch_hole_position:
-        description: '挖孔坐标（留空跳过）'
+      kernel_branch:
+        description: '内核分支'
         required: false
-        default: ''
-      soc_model:
-        description: '芯片平台（留空自动检测）'
-        required: false
-        default: ''
-      serial_no:
-        description: '序列号（留空自动读取）'
-        required: false
-        default: ''
-      replace_selinux:
-        description: '是否替换 SELinux'
-        type: boolean
-        default: false
-      patch_first_api_level:
-        description: '是否修补 first_api_level'
-        type: boolean
-        default: true
-      patch_openid:
-        description: '是否修复 OpenID/OUID'
-        type: boolean
-        default: true
-      upload_pan123:
-        description: '上传到 123 网盘（推荐）'
-        type: boolean
-        default: true
-      upload_release:
-        description: '上传到 GitHub Release'
-        type: boolean
-        default: false
-      upload_r2:
-        description: '上传到 Cloudflare R2'
-        type: boolean
-        default: false
-      upload_alist:
-        description: '上传到 Alist'
-        type: boolean
-        default: false
-      upload_artifact:
-        description: '上传到 GitHub Artifact'
-        type: boolean
-        default: false
-      pan123_client_id:
-        description: '123 Client ID（留空用 Secrets）'
-        required: false
-        default: ''
-      pan123_client_secret:
-        description: '123 Client Secret（留空用 Secrets）'
-        required: false
-        default: ''
-      r2_access_key:
-        description: 'R2 Access Key（留空用 Secrets）'
-        required: false
-        default: ''
-      r2_secret_key:
-        description: 'R2 Secret Key（留空用 Secrets）'
-        required: false
-        default: ''
-      r2_endpoint:
-        description: 'R2 Endpoint（留空用 Secrets）'
-        required: false
-        default: ''
-      r2_bucket:
-        description: 'R2 Bucket（留空用 Secrets）'
-        required: false
-        default: ''
-      alist_url:
-        description: 'Alist URL（留空用 Secrets）'
-        required: false
-        default: ''
-      alist_token:
-        description: 'Alist Token（留空用 Secrets）'
-        required: false
-        default: ''
-      alist_path:
-        description: 'Alist 路径（留空用 Secrets）'
-        required: false
-        default: ''
+        default: 'lineage-20'
+      defconfig_name:
+        description: 'defconfig 名'
+        required: true
+      device_tree_repo:
+        description: '设备树仓库地址'
+        required: true
 
 jobs:
   port:
@@ -240,13 +31,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: 读取配置
+        run: |
+          python3 << 'PYEOF'
+          import yaml, os
+          with open('.github/workflows/port-config.yml') as f:
+              cfg = yaml.safe_load(f)
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              def walk(prefix, d):
+                  for k, v in d.items():
+                      key = f"{prefix}_{k}".upper() if prefix else k.upper()
+                      if isinstance(v, dict):
+                          walk(key, v)
+                      else:
+                          f.write(f"CFG_{key}={v}\n")
+              walk("", cfg)
+          PYEOF
+
       - name: 安装依赖
         run: |
           sudo apt update
           sudo apt install -y python3 python3-pip unzip zip aria2 \
             android-sdk-libsparse-utils erofs-utils simg2img img2simg \
             brotli lz4 xz-utils u-boot-tools
-          pip3 install protobuf
+          pip3 install protobuf pyyaml
 
       - name: 下载固件
         run: bash scripts/download.sh "${{ inputs.base_rom_url }}" "${{ inputs.coloros_url }}"
@@ -261,95 +69,77 @@ jobs:
         run: bash scripts/analyze-kernel.sh
 
       - name: 集成 Root
-        if: inputs.enable_root
+        if: env.CFG_ROOT_ENABLE == 'true'
         env:
-          ENABLE_ROOT: ${{ inputs.enable_root }}
-          ROOT_TYPE: ${{ inputs.root_type }}
-          ROOT_VERSION: ${{ inputs.root_version }}
+          ENABLE_ROOT: ${{ env.CFG_ROOT_ENABLE }}
+          ROOT_TYPE: ${{ env.CFG_ROOT_TYPE }}
+          ROOT_VERSION: ${{ env.CFG_ROOT_VERSION }}
           KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
           KERNEL_BRANCH: ${{ inputs.kernel_branch }}
           DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
         run: bash scripts/integrate-root.sh
 
       - name: 编译内核
-  if: inputs.enable_root && env.ROOT_INTEGRATED == 'true'
-  env:
-    ROOT_TYPE: ${{ inputs.root_type }}
-    KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
-    DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
-  run: bash scripts/build-kernel.sh
-
-- name: 输出 BPF 补丁状态
-  if: inputs.enable_root && env.KERNEL_BUILT == 'true'
-  run: |
-    if [ "$BPF_PATCHED" = "true" ]; then
-      echo "## ✓ MTK BPF 补丁已应用" >> $GITHUB_STEP_SUMMARY
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo "内核已修复 MTK 4.14 BPF 问题，可兼容 Android 12+ GSI。" >> $GITHUB_STEP_SUMMARY
-    else
-      echo "## ⚠️ MTK BPF 补丁未应用" >> $GITHUB_STEP_SUMMARY
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo "内核未打 BPF 补丁，Android 12+ 可能出现网络问题。" >> $GITHUB_STEP_SUMMARY
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo "手动修复：" >> $GITHUB_STEP_SUMMARY
-      echo '```bash' >> $GITHUB_STEP_SUMMARY
-      echo "git clone https://github.com/R0rt1z2/mtk-bpf-patcher.git" >> $GITHUB_STEP_SUMMARY
-      echo "cd mtk-bpf-patcher && cargo build --release" >> $GITHUB_STEP_SUMMARY
-      echo "./target/release/mtk-bpf-patcher <输入内核> <输出内核>" >> $GITHUB_STEP_SUMMARY
-      echo '```' >> $GITHUB_STEP_SUMMARY
-    fi
+        if: env.CFG_ROOT_ENABLE == 'true' && env.ROOT_INTEGRATED == 'true'
+        env:
+          ROOT_TYPE: ${{ env.CFG_ROOT_TYPE }}
+          KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+          DEVICE_MODEL: ${{ env.CFG_DEVICE_MODEL }}
+          SYSTEM_NAME: ${{ env.CFG_DEVICE_SYSTEM_NAME }}
+        run: bash scripts/build-kernel.sh
 
       - name: 合并分区
         run: bash scripts/merge-partitions.sh
 
       - name: 精简 APP
         env:
-          DEBLOAT_AD: ${{ inputs.debloat_ad }}
-          DEBLOAT_APP_MARKET: ${{ inputs.debloat_app_market }}
-          DEBLOAT_GAME_CENTER: ${{ inputs.debloat_game_center }}
-          DEBLOAT_BROWSER: ${{ inputs.debloat_browser }}
-          DEBLOAT_CONTENT_EXT: ${{ inputs.debloat_content_ext }}
-          DEBLOAT_THEME_STORE: ${{ inputs.debloat_theme_store }}
-          DEBLOAT_VOICE_ASSISTANT: ${{ inputs.debloat_voice_assistant }}
-          DEBLOAT_MUSIC: ${{ inputs.debloat_music }}
-          DEBLOAT_VIDEO: ${{ inputs.debloat_video }}
-          DEBLOAT_FEEDBACK: ${{ inputs.debloat_feedback }}
-          DEBLOAT_OTA: ${{ inputs.debloat_ota }}
+          DEBLOAT_AD: ${{ env.CFG_DEBLOAT_AD }}
+          DEBLOAT_APP_MARKET: ${{ env.CFG_DEBLOAT_APP_MARKET }}
+          DEBLOAT_GAME_CENTER: ${{ env.CFG_DEBLOAT_GAME_CENTER }}
+          DEBLOAT_BROWSER: ${{ env.CFG_DEBLOAT_BROWSER }}
+          DEBLOAT_CONTENT_EXT: ${{ env.CFG_DEBLOAT_CONTENT_EXT }}
+          DEBLOAT_THEME_STORE: ${{ env.CFG_DEBLOAT_THEME_STORE }}
+          DEBLOAT_VOICE_ASSISTANT: ${{ env.CFG_DEBLOAT_VOICE_ASSISTANT }}
+          DEBLOAT_MUSIC: ${{ env.CFG_DEBLOAT_MUSIC }}
+          DEBLOAT_VIDEO: ${{ env.CFG_DEBLOAT_VIDEO }}
+          DEBLOAT_FEEDBACK: ${{ env.CFG_DEBLOAT_FEEDBACK }}
+          DEBLOAT_OTA: ${{ env.CFG_DEBLOAT_OTA }}
         run: bash scripts/debloat.sh
 
       - name: 替换默认应用
         env:
-          REPLACE_BROWSER: ${{ inputs.replace_browser }}
-          REPLACE_BROWSER_URL: ${{ inputs.replace_browser_url }}
-          REPLACE_GALLERY: ${{ inputs.replace_gallery }}
-          REPLACE_GALLERY_URL: ${{ inputs.replace_gallery_url }}
-          REPLACE_FILE_MANAGER: ${{ inputs.replace_file_manager }}
-          REPLACE_FILE_MANAGER_URL: ${{ inputs.replace_file_manager_url }}
+          REPLACE_BROWSER: ${{ env.CFG_REPLACE_BROWSER_ENABLE }}
+          REPLACE_BROWSER_URL: ${{ env.CFG_REPLACE_BROWSER_URL }}
+          REPLACE_GALLERY: ${{ env.CFG_REPLACE_GALLERY_ENABLE }}
+          REPLACE_GALLERY_URL: ${{ env.CFG_REPLACE_GALLERY_URL }}
+          REPLACE_FILE_MANAGER: ${{ env.CFG_REPLACE_FILE_MANAGER_ENABLE }}
+          REPLACE_FILE_MANAGER_URL: ${{ env.CFG_REPLACE_FILE_MANAGER_URL }}
         run: bash scripts/replace-apps.sh
 
       - name: 系统级修复
         env:
-          FIX_OPENID: ${{ inputs.fix_openid }}
-          FIX_SELINUX: ${{ inputs.fix_selinux }}
-          FIX_AUDIO: ${{ inputs.fix_audio }}
-          FIX_VIBRATOR: ${{ inputs.fix_vibrator }}
-          FIX_HDR: ${{ inputs.fix_hdr }}
-          FIX_WECHAT_SCAN: ${{ inputs.fix_wechat_scan }}
-          FIX_WALLPAPER: ${{ inputs.fix_wallpaper }}
-          FIX_COLOR_TEMP: ${{ inputs.fix_color_temp }}
-          FIX_NFC: ${{ inputs.fix_nfc }}
-          FIX_MODEM: ${{ inputs.fix_modem }}
+          FIX_OPENID: ${{ env.CFG_FIX_OPENID }}
+          FIX_SELINUX: ${{ env.CFG_FIX_SELINUX }}
+          FIX_AUDIO: ${{ env.CFG_FIX_AUDIO }}
+          FIX_VIBRATOR: ${{ env.CFG_FIX_VIBRATOR }}
+          FIX_HDR: ${{ env.CFG_FIX_HDR }}
+          FIX_WECHAT_SCAN: ${{ env.CFG_FIX_WECHAT_SCAN }}
+          FIX_WALLPAPER: ${{ env.CFG_FIX_WALLPAPER }}
+          FIX_COLOR_TEMP: ${{ env.CFG_FIX_COLOR_TEMP }}
+          FIX_NFC: ${{ env.CFG_FIX_NFC }}
+          FIX_MODEM: ${{ env.CFG_FIX_MODEM }}
         run: bash scripts/system-fixes.sh
 
       - name: 应用机型补丁
         env:
-          DEVICE_MODEL: ${{ inputs.device_model }}
-          PUNCH_HOLE_POSITION: ${{ inputs.punch_hole_position }}
-          SOC_MODEL: ${{ inputs.soc_model }}
-          SERIAL_NO: ${{ inputs.serial_no }}
-          REPLACE_SELINUX: ${{ inputs.replace_selinux }}
-          PATCH_FIRST_API_LEVEL: ${{ inputs.patch_first_api_level }}
-          PATCH_OPENID: ${{ inputs.patch_openid }}
+          DEVICE_MODEL: ${{ env.CFG_DEVICE_MODEL }}
+          PUNCH_HOLE_POSITION: ${{ env.CFG_DEVICE_PUNCH_HOLE_POSITION }}
+          SOC_MODEL: ${{ env.CFG_DEVICE_SOC_MODEL }}
+          SERIAL_NO: ${{ env.CFG_DEVICE_SERIAL_NO }}
+          REPLACE_SELINUX: ${{ env.CFG_PATCH_REPLACE_SELINUX }}
+          PATCH_FIRST_API_LEVEL: ${{ env.CFG_PATCH_FIRST_API_LEVEL }}
+          PATCH_OPENID: ${{ env.CFG_PATCH_OPENID }}
         run: bash scripts/apply-patches.sh
 
       - name: 修复 fstab
@@ -357,8 +147,10 @@ jobs:
 
       - name: 打包
         env:
-          PACK_MODE: ${{ inputs.pack_mode }}
-          SUPER_SIZE: ${{ inputs.super_size }}
+          PACK_MODE: ${{ env.CFG_PACK_MODE }}
+          SUPER_SIZE: ${{ env.CFG_PACK_SUPER_SIZE }}
+          DEVICE_MODEL: ${{ env.CFG_DEVICE_MODEL }}
+          SYSTEM_NAME: ${{ env.CFG_DEVICE_SYSTEM_NAME }}
         run: bash scripts/pack.sh
 
       - name: 验证镜像
@@ -373,8 +165,10 @@ jobs:
       - name: 重新打包
         if: steps.verify1.outcome == 'failure' && env.NEED_REPACK == 'true'
         env:
-          PACK_MODE: ${{ inputs.pack_mode }}
-          SUPER_SIZE: ${{ inputs.super_size }}
+          PACK_MODE: ${{ env.CFG_PACK_MODE }}
+          SUPER_SIZE: ${{ env.CFG_PACK_SUPER_SIZE }}
+          DEVICE_MODEL: ${{ env.CFG_DEVICE_MODEL }}
+          SYSTEM_NAME: ${{ env.CFG_DEVICE_SYSTEM_NAME }}
         run: bash scripts/pack.sh
 
       - name: 二次验证
@@ -388,48 +182,47 @@ jobs:
         run: bash scripts/rollback-fix.sh
 
       - name: 上传到 123 网盘
-        if: inputs.upload_pan123
+        if: env.CFG_UPLOAD_PAN123 == 'true'
         env:
-          PAN123_CLIENT_ID: ${{ inputs.pan123_client_id || secrets.PAN123_CLIENT_ID }}
-          PAN123_CLIENT_SECRET: ${{ inputs.pan123_client_secret || secrets.PAN123_CLIENT_SECRET }}
+          PAN123_CLIENT_ID: ${{ secrets.PAN123_CLIENT_ID }}
+          PAN123_CLIENT_SECRET: ${{ secrets.PAN123_CLIENT_SECRET }}
         run: bash scripts/upload-pan123.sh
 
       - name: 上传到 Release
-        if: inputs.upload_release
+        if: env.CFG_UPLOAD_RELEASE == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: coloros16-${{ github.run_number }}
-          name: "ColorOS 16 Port #${{ github.run_number }}"
+          tag_name: ${{ env.CFG_DEVICE_MODEL }}-${{ env.CFG_DEVICE_SYSTEM_NAME }}-${{ github.run_number }}
+          name: "${{ env.CFG_DEVICE_MODEL }} ${{ env.CFG_DEVICE_SYSTEM_NAME }} #${{ github.run_number }}"
           files: |
             work/output/*.zip
-            work/output/super.img
+            work/output/*.img
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 上传到 R2
-        if: inputs.upload_r2
+        if: env.CFG_UPLOAD_R2 == 'true'
         env:
-          R2_ACCESS_KEY: ${{ inputs.r2_access_key || secrets.R2_ACCESS_KEY }}
-          R2_SECRET_KEY: ${{ inputs.r2_secret_key || secrets.R2_SECRET_KEY }}
-          R2_ENDPOINT: ${{ inputs.r2_endpoint || secrets.R2_ENDPOINT }}
-          R2_BUCKET: ${{ inputs.r2_bucket || secrets.R2_BUCKET }}
+          R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: bash scripts/upload-r2.sh
 
       - name: 上传到 Alist
-        if: inputs.upload_alist
+        if: env.CFG_UPLOAD_ALIST == 'true'
         env:
-          ALIST_URL: ${{ inputs.alist_url || secrets.ALIST_URL }}
-          ALIST_TOKEN: ${{ inputs.alist_token || secrets.ALIST_TOKEN }}
-          ALIST_PATH: ${{ inputs.alist_path || secrets.ALIST_PATH }}
+          ALIST_URL: ${{ secrets.ALIST_URL }}
+          ALIST_TOKEN: ${{ secrets.ALIST_TOKEN }}
+          ALIST_PATH: ${{ secrets.ALIST_PATH }}
         run: bash scripts/upload-alist.sh
 
       - name: 上传到 Artifact
-        if: inputs.upload_artifact
+        if: env.CFG_UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: coloros16-port
+          name: ${{ env.CFG_DEVICE_MODEL }}-${{ env.CFG_DEVICE_SYSTEM_NAME }}
           path: |
             work/output/*.zip
-            work/output/super.img
-            work/verify/*.log
+            work/output/*.img
           retention-days: 7
