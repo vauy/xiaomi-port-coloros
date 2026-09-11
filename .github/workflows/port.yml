@@ -1,0 +1,408 @@
+name: Port ColorOS 16
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_rom_url:
+        description: 'MIUI/澎湃底包直链'
+        required: true
+      coloros_url:
+        description: 'ColorOS 16 移植包直链'
+        required: true
+      kernel_source_repo:
+        description: '内核源码仓库地址（可选）'
+        required: false
+        default: ''
+      defconfig_name:
+        description: 'defconfig 名（如 xiaomi_defconfig）'
+        required: false
+        default: ''
+      enable_root:
+        description: '是否集成 KernelSU'
+        type: boolean
+        default: true
+      root_type:
+        description: 'Root 方案'
+        type: choice
+        options: [kernelsu-next, kernelsu]
+        default: 'kernelsu-next'
+      root_version:
+        description: 'KernelSU 版本（留空用最新）'
+        required: false
+        default: ''
+      pack_mode:
+        description: '打包模式'
+        type: choice
+        options: [zip, super, both]
+        default: 'both'
+      super_size:
+        description: 'super 分区大小（字节）'
+        default: '8589934592'
+      debloat_ad:
+        description: '精简：广告服务'
+        type: boolean
+        default: true
+      debloat_app_market:
+        description: '精简：OPPO 软件商店'
+        type: boolean
+        default: true
+      debloat_game_center:
+        description: '精简：游戏中心'
+        type: boolean
+        default: true
+      debloat_browser:
+        description: '精简：自带浏览器'
+        type: boolean
+        default: true
+      debloat_content_ext:
+        description: '精简：内容推荐服务'
+        type: boolean
+        default: true
+      debloat_theme_store:
+        description: '精简：主题商店'
+        type: boolean
+        default: true
+      debloat_voice_assistant:
+        description: '精简：小布语音助手'
+        type: boolean
+        default: true
+      debloat_music:
+        description: '精简：自带音乐'
+        type: boolean
+        default: true
+      debloat_video:
+        description: '精简：自带视频'
+        type: boolean
+        default: true
+      debloat_feedback:
+        description: '精简：用户反馈'
+        type: boolean
+        default: true
+      debloat_ota:
+        description: '精简：OTA 更新服务'
+        type: boolean
+        default: true
+      replace_browser:
+        description: '替换：浏览器 → Via'
+        type: boolean
+        default: true
+      replace_browser_url:
+        description: 'Via 浏览器 APK 直链'
+        default: 'https://github.com/viayoo/ViaBrowser/releases/latest/download/ViaBrowser.apk'
+      replace_gallery:
+        description: '替换：相册 → Simple Gallery'
+        type: boolean
+        default: false
+      replace_gallery_url:
+        description: 'Simple Gallery APK 直链'
+        default: 'https://github.com/SimpleMobileTools/Simple-Gallery/releases/latest/download/SimpleGallery.apk'
+      replace_file_manager:
+        description: '替换：文件管理 → Material Files'
+        type: boolean
+        default: false
+      replace_file_manager_url:
+        description: 'Material Files APK 直链'
+        default: 'https://github.com/zhanghai/MaterialFiles/releases/latest/download/MaterialFiles.apk'
+      fix_openid:
+        description: '修复：OpenID/OUID 卡顿'
+        type: boolean
+        default: false
+      fix_selinux:
+        description: '修复：SELinux 拒绝'
+        type: boolean
+        default: false
+      fix_audio:
+        description: '修复：音频炸裂'
+        type: boolean
+        default: false
+      fix_vibrator:
+        description: '修复：振动异常'
+        type: boolean
+        default: false
+      fix_hdr:
+        description: '修复：抖音卡顿（HDR）'
+        type: boolean
+        default: false
+      fix_wechat_scan:
+        description: '修复：微信扫一扫'
+        type: boolean
+        default: false
+      fix_wallpaper:
+        description: '修复：实况壁纸黑屏'
+        type: boolean
+        default: false
+      fix_color_temp:
+        description: '修复：屏幕色温异常'
+        type: boolean
+        default: false
+      fix_nfc:
+        description: '修复：NFC 不可用'
+        type: boolean
+        default: false
+      fix_modem:
+        description: '修复：信号丢失'
+        type: boolean
+        default: false
+      device_model:
+        description: '机型标识（如 xiaomi13）'
+        required: true
+        default: 'xiaomi_xxx'
+      punch_hole_position:
+        description: '挖孔坐标（留空跳过）'
+        required: false
+        default: ''
+      soc_model:
+        description: '芯片平台（留空自动检测）'
+        required: false
+        default: ''
+      serial_no:
+        description: '序列号（留空自动读取）'
+        required: false
+        default: ''
+      replace_selinux:
+        description: '是否替换 SELinux'
+        type: boolean
+        default: false
+      patch_first_api_level:
+        description: '是否修补 first_api_level'
+        type: boolean
+        default: true
+      patch_openid:
+        description: '是否修复 OpenID/OUID'
+        type: boolean
+        default: true
+      upload_pan123:
+        description: '上传到 123 网盘（推荐）'
+        type: boolean
+        default: true
+      upload_release:
+        description: '上传到 GitHub Release'
+        type: boolean
+        default: false
+      upload_r2:
+        description: '上传到 Cloudflare R2'
+        type: boolean
+        default: false
+      upload_alist:
+        description: '上传到 Alist'
+        type: boolean
+        default: false
+      upload_artifact:
+        description: '上传到 GitHub Artifact'
+        type: boolean
+        default: false
+      pan123_client_id:
+        description: '123 Client ID（留空用 Secrets）'
+        required: false
+        default: ''
+      pan123_client_secret:
+        description: '123 Client Secret（留空用 Secrets）'
+        required: false
+        default: ''
+      r2_access_key:
+        description: 'R2 Access Key（留空用 Secrets）'
+        required: false
+        default: ''
+      r2_secret_key:
+        description: 'R2 Secret Key（留空用 Secrets）'
+        required: false
+        default: ''
+      r2_endpoint:
+        description: 'R2 Endpoint（留空用 Secrets）'
+        required: false
+        default: ''
+      r2_bucket:
+        description: 'R2 Bucket（留空用 Secrets）'
+        required: false
+        default: ''
+      alist_url:
+        description: 'Alist URL（留空用 Secrets）'
+        required: false
+        default: ''
+      alist_token:
+        description: 'Alist Token（留空用 Secrets）'
+        required: false
+        default: ''
+      alist_path:
+        description: 'Alist 路径（留空用 Secrets）'
+        required: false
+        default: ''
+
+jobs:
+  port:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: |
+          sudo apt update
+          sudo apt install -y python3 python3-pip unzip zip aria2 \
+            android-sdk-libsparse-utils erofs-utils simg2img img2simg \
+            brotli lz4 xz-utils
+          pip3 install protobuf
+
+      - name: 下载固件
+        run: bash scripts/download.sh "${{ inputs.base_rom_url }}" "${{ inputs.coloros_url }}"
+
+      - name: 解包
+        run: bash scripts/unpack.sh
+
+      - name: 分析内核配置
+        env:
+          KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+        run: bash scripts/analyze-kernel.sh
+
+      - name: 集成 Root
+        if: inputs.enable_root
+        env:
+          ENABLE_ROOT: ${{ inputs.enable_root }}
+          ROOT_TYPE: ${{ inputs.root_type }}
+          ROOT_VERSION: ${{ inputs.root_version }}
+          KERNEL_SOURCE_REPO: ${{ inputs.kernel_source_repo }}
+          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+        run: bash scripts/integrate-root.sh
+
+      - name: 编译内核
+        if: inputs.enable_root && env.ROOT_INTEGRATED == 'true'
+        env:
+          ROOT_TYPE: ${{ inputs.root_type }}
+          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+        run: bash scripts/build-kernel.sh
+
+      - name: 合并分区
+        run: bash scripts/merge-partitions.sh
+
+      - name: 精简 APP
+        env:
+          DEBLOAT_AD: ${{ inputs.debloat_ad }}
+          DEBLOAT_APP_MARKET: ${{ inputs.debloat_app_market }}
+          DEBLOAT_GAME_CENTER: ${{ inputs.debloat_game_center }}
+          DEBLOAT_BROWSER: ${{ inputs.debloat_browser }}
+          DEBLOAT_CONTENT_EXT: ${{ inputs.debloat_content_ext }}
+          DEBLOAT_THEME_STORE: ${{ inputs.debloat_theme_store }}
+          DEBLOAT_VOICE_ASSISTANT: ${{ inputs.debloat_voice_assistant }}
+          DEBLOAT_MUSIC: ${{ inputs.debloat_music }}
+          DEBLOAT_VIDEO: ${{ inputs.debloat_video }}
+          DEBLOAT_FEEDBACK: ${{ inputs.debloat_feedback }}
+          DEBLOAT_OTA: ${{ inputs.debloat_ota }}
+        run: bash scripts/debloat.sh
+
+      - name: 替换默认应用
+        env:
+          REPLACE_BROWSER: ${{ inputs.replace_browser }}
+          REPLACE_BROWSER_URL: ${{ inputs.replace_browser_url }}
+          REPLACE_GALLERY: ${{ inputs.replace_gallery }}
+          REPLACE_GALLERY_URL: ${{ inputs.replace_gallery_url }}
+          REPLACE_FILE_MANAGER: ${{ inputs.replace_file_manager }}
+          REPLACE_FILE_MANAGER_URL: ${{ inputs.replace_file_manager_url }}
+        run: bash scripts/replace-apps.sh
+
+      - name: 系统级修复
+        env:
+          FIX_OPENID: ${{ inputs.fix_openid }}
+          FIX_SELINUX: ${{ inputs.fix_selinux }}
+          FIX_AUDIO: ${{ inputs.fix_audio }}
+          FIX_VIBRATOR: ${{ inputs.fix_vibrator }}
+          FIX_HDR: ${{ inputs.fix_hdr }}
+          FIX_WECHAT_SCAN: ${{ inputs.fix_wechat_scan }}
+          FIX_WALLPAPER: ${{ inputs.fix_wallpaper }}
+          FIX_COLOR_TEMP: ${{ inputs.fix_color_temp }}
+          FIX_NFC: ${{ inputs.fix_nfc }}
+          FIX_MODEM: ${{ inputs.fix_modem }}
+        run: bash scripts/system-fixes.sh
+
+      - name: 应用机型补丁
+        env:
+          DEVICE_MODEL: ${{ inputs.device_model }}
+          PUNCH_HOLE_POSITION: ${{ inputs.punch_hole_position }}
+          SOC_MODEL: ${{ inputs.soc_model }}
+          SERIAL_NO: ${{ inputs.serial_no }}
+          REPLACE_SELINUX: ${{ inputs.replace_selinux }}
+          PATCH_FIRST_API_LEVEL: ${{ inputs.patch_first_api_level }}
+          PATCH_OPENID: ${{ inputs.patch_openid }}
+        run: bash scripts/apply-patches.sh
+
+      - name: 修复 fstab
+        run: bash scripts/fix-fstab.sh
+
+      - name: 打包
+        env:
+          PACK_MODE: ${{ inputs.pack_mode }}
+          SUPER_SIZE: ${{ inputs.super_size }}
+        run: bash scripts/pack.sh
+
+      - name: 验证镜像
+        id: verify1
+        continue-on-error: true
+        run: bash scripts/verify.sh
+
+      - name: 分析日志并自动修复
+        if: steps.verify1.outcome == 'failure'
+        run: bash scripts/analyze-and-fix.sh
+
+      - name: 重新打包
+        if: steps.verify1.outcome == 'failure' && env.NEED_REPACK == 'true'
+        env:
+          PACK_MODE: ${{ inputs.pack_mode }}
+          SUPER_SIZE: ${{ inputs.super_size }}
+        run: bash scripts/pack.sh
+
+      - name: 二次验证
+        id: verify2
+        if: steps.verify1.outcome == 'failure' && env.NEED_REPACK == 'true'
+        continue-on-error: true
+        run: bash scripts/verify.sh
+
+      - name: 回滚
+        if: steps.verify2.outcome == 'failure' && env.ROLLBACK_NEEDED == 'true'
+        run: bash scripts/rollback-fix.sh
+
+      - name: 上传到 123 网盘
+        if: inputs.upload_pan123
+        env:
+          PAN123_CLIENT_ID: ${{ inputs.pan123_client_id || secrets.PAN123_CLIENT_ID }}
+          PAN123_CLIENT_SECRET: ${{ inputs.pan123_client_secret || secrets.PAN123_CLIENT_SECRET }}
+        run: bash scripts/upload-pan123.sh
+
+      - name: 上传到 Release
+        if: inputs.upload_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: coloros16-${{ github.run_number }}
+          name: "ColorOS 16 Port #${{ github.run_number }}"
+          files: |
+            work/output/*.zip
+            work/output/super.img
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传到 R2
+        if: inputs.upload_r2
+        env:
+          R2_ACCESS_KEY: ${{ inputs.r2_access_key || secrets.R2_ACCESS_KEY }}
+          R2_SECRET_KEY: ${{ inputs.r2_secret_key || secrets.R2_SECRET_KEY }}
+          R2_ENDPOINT: ${{ inputs.r2_endpoint || secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ inputs.r2_bucket || secrets.R2_BUCKET }}
+        run: bash scripts/upload-r2.sh
+
+      - name: 上传到 Alist
+        if: inputs.upload_alist
+        env:
+          ALIST_URL: ${{ inputs.alist_url || secrets.ALIST_URL }}
+          ALIST_TOKEN: ${{ inputs.alist_token || secrets.ALIST_TOKEN }}
+          ALIST_PATH: ${{ inputs.alist_path || secrets.ALIST_PATH }}
+        run: bash scripts/upload-alist.sh
+
+      - name: 上传到 Artifact
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coloros16-port
+          path: |
+            work/output/*.zip
+            work/output/super.img
+            work/verify/*.log
+          retention-days: 7
