@@ -9,9 +9,9 @@ mkdir -p "$OUT"
 KERNEL_HAS_EROFS="${KERNEL_HAS_EROFS:-true}"
 KERNEL_HAS_EROFS_LZ4="${KERNEL_HAS_EROFS_LZ4:-true}"
 
-# 命名参数
-DEVICE="${DEVICE_MODEL:-cannon}"
-SYSTEM_NAME="${SYSTEM_NAME:-ColorOS}"
+# 命名参数：优先 CFG_，其次直接变量，最后默认值
+DEVICE="${CFG_DEVICE_MODEL:-${DEVICE_MODEL:-cannon}}"
+SYSTEM_NAME="${CFG_DEVICE_SYSTEM_NAME:-${SYSTEM_NAME:-ColorOS}}"
 ANDROID_VER="${ANDROID_VER:-15}"
 ANDROID_TAG="A${ANDROID_VER}"
 DATE_TAG=$(date +%y%m%d)
@@ -42,7 +42,7 @@ build_zip() {
   mkdir -p META-INF/com/google/android
   cat > META-INF/com/google/android/updater-script << 'EOFS'
 ui_print("========================================");
-ui_print("ColorOS 16 Port");
+ui_print("ColorOS Port");
 ui_print("========================================");
 package_extract_dir("system", "/system");
 package_extract_dir("vendor", "/vendor");
