@@ -84,8 +84,8 @@ patch:
   openid: true
 
 upload:
-  pan123: true
-  release: false
+  pan123: false
+  release: true
   r2: false
   alist: false
   artifact: false
