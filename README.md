@@ -218,3 +218,113 @@
 cd kernel_src
 grep "KernelSU" drivers/Makefile
 grep "KernelSU" drivers/Kconfig
+```
+
+### 错误 2：`Kbuild: No such file or directory`
+
+**原因**：KernelSU 目录名和 Kbuild 里写的不一致。
+
+**修复**：
+```bash
+ls -la kernel_src/ | grep -i kernelsu
+```
+
+### 错误 3：`pattern not found in fs/exec.c`
+
+**原因**：手动补丁的正则没匹配到函数签名。
+
+**修复**：
+```bash
+grep -A2 "do_execveat_common" kernel_src/fs/exec.c
+grep -A2 "vfs_fstatat\|vfs_statx" kernel_src/fs/stat.c
+```
+
+### 错误 4：`aarch64-linux-gnu-gcc: command not found`
+
+**修复**：
+```bash
+sudo apt install -y gcc-aarch64-linux-gnu
+```
+
+### 错误 5：`Image.lz4-dtb` 不存在
+
+**原因**：产物名不对，有些内核是 `Image.gz-dtb`。
+
+**修复**：
+```bash
+ls kernel_src/out/arch/arm64/boot/
+```
+
+---
+
+## 📁 脚本说明
+
+| 脚本 | 作用 |
+|---|---|
+| `download.sh` | 下载底包和 ColorOS |
+| `unpack.sh` | 解包 payload/super/EROFS |
+| `analyze-kernel.sh` | 分析内核配置，确定 EROFS/LZ4 能力 |
+| `integrate-root.sh` | 集成 KernelSU Next，失败回退原版 |
+| `build-kernel.sh` | 编译内核，失败自动回退 |
+| `merge-partitions.sh` | 合并 my 分区、补 system_ext |
+| `debloat.sh` | 按开关删除指定 APP |
+| `replace-apps.sh` | 替换默认应用 |
+| `system-fixes.sh` | 系统级修复 |
+| `apply-patches.sh` | 机型补丁 |
+| `fix-fstab.sh` | 清理 AVB |
+| `pack.sh` | 打包成 zip 或 super.img |
+| `verify.sh` | 验证镜像合法性 |
+| `analyze-and-fix.sh` | 日志分析 + 自动修复 |
+| `rollback-fix.sh` | 回滚修复 |
+| `upload-pan123.sh` | 上传到 123 网盘 |
+| `upload-r2.sh` | 上传到 Cloudflare R2 |
+| `upload-alist.sh` | 上传到 Alist |
+
+---
+
+## ❓ 常见问题
+
+### Q: 没配 Secrets 会怎样？
+
+勾选了对应上传方式但没配 Secrets，脚本会输出提示并跳过，不会报错。
+
+### Q: 输入项和 Secrets 哪个优先？
+
+**输入项优先**。输入项填了就用输入项，留空则回退到 Secrets。
+
+### Q: 输入项安全吗？
+
+**不安全**。输入项会记录在 Actions 运行日志里，公开仓库建议用 Secrets。
+
+### Q: 编译内核需要多久？
+
+4.14 内核首次编译约 20-40 分钟。工作流超时设为 300 分钟。
+
+### Q: 没提供内核源码能集成 Root 吗？
+
+不能。Root 集成必须有内核源码，没源码时自动跳过。
+
+### Q: 挖孔坐标填错了会怎样？
+
+流体云位置会偏，但不影响开机。用开发者选项「指针位置」实测。
+
+### Q: 精简了输入法会怎样？
+
+**开机后无法输入**。强烈建议保持 `debloat_ime` 为 `false`。
+
+### Q: 上传到 123 网盘失败怎么办？
+
+检查：
+1. `PAN123_CLIENT_ID` 和 `PAN123_CLIENT_SECRET` 是否正确
+2. 123 账号是否已实名认证
+3. 日志里有没有 `signature error`
+
+### Q: 怎么切换上传到 Release？
+
+在 Actions 里勾 `upload_release`，取消 `upload_pan123` 即可。Release 无需配置。
+
+---
+
+## 📄 许可证
+
+仅供学习交流，请勿用于商业用途。移植 ROM 的版权归原厂商所有。
