@@ -1,4 +1,4 @@
-name: Build GSI (cannon)
+name: Build GSI (Universal)
 
 on:
   workflow_dispatch:
@@ -45,6 +45,12 @@ on:
         type: choice
         options: [kernelsu-next, kernelsu]
         default: 'kernelsu-next'
+
+      # ===== 内核补丁 =====
+      enable_bpf_patch:
+        description: '启用 MTK BPF 补丁（4.14/4.19 内核必开）'
+        type: boolean
+        default: true
 
       # ===== 注入选项 =====
       inject_features:
@@ -133,6 +139,13 @@ jobs:
           DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
         run: bash scripts/build-gsi.sh kernel
 
+      - name: 应用 MTK BPF 补丁
+        if: inputs.enable_bpf_patch
+        env:
+          KERNEL_IMG_URL: ''
+          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+        run: bash scripts/patch-bpf.sh
+
       - name: 注入配置并构建 GSI
         env:
           GSI_IMG: gsi/base.img
@@ -144,6 +157,17 @@ jobs:
           INJECT_PERMISSIONS: ${{ inputs.inject_permissions }}
           OUTPUT_FORMAT: ${{ inputs.output_format }}
         run: bash scripts/build-gsi.sh gsi
+
+      - name: 输出 BPF 补丁状态
+        if: inputs.enable_bpf_patch
+        run: |
+          if [ "$BPF_PATCHED" = "true" ]; then
+            echo "## ✓ MTK BPF 补丁已应用" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ MTK BPF 补丁未应用" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Android 12+ 可能出现网络问题。" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: 验证产物
         run: |
@@ -167,5 +191,4 @@ jobs:
           path: |
             work/gsi/*.img
             work/gsi/*.zip
-            work/verify/*.log
           retention-days: 7
