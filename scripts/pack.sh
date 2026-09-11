@@ -9,6 +9,13 @@ mkdir -p "$OUT"
 KERNEL_HAS_EROFS="${KERNEL_HAS_EROFS:-true}"
 KERNEL_HAS_EROFS_LZ4="${KERNEL_HAS_EROFS_LZ4:-true}"
 
+# 命名参数
+DEVICE="${DEVICE_MODEL:-cannon}"
+SYSTEM_NAME="${SYSTEM_NAME:-ColorOS}"
+ANDROID_VER="${ANDROID_VER:-15}"
+ANDROID_TAG="A${ANDROID_VER}"
+DATE_TAG=$(date +%y%m%d)
+
 pack_partitions() {
   cd coloros
   for dir in */; do
@@ -34,7 +41,9 @@ build_zip() {
   cd "$OUT"
   mkdir -p META-INF/com/google/android
   cat > META-INF/com/google/android/updater-script << 'EOFS'
+ui_print("========================================");
 ui_print("ColorOS 16 Port");
+ui_print("========================================");
 package_extract_dir("system", "/system");
 package_extract_dir("vendor", "/vendor");
 package_extract_dir("my_product", "/my_product");
@@ -50,7 +59,10 @@ unzip -o "$ZIPFILE" 'META-INF/com/google/android/updater-script' -d /tmp > /dev/
 EOFB
   chmod +x META-INF/com/google/android/update-binary
   cp ../coloros/*.img . 2>/dev/null || true
-  zip -r coloros16-port.zip META-INF/ *.img 2>/dev/null
+
+  ZIP_NAME="${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}.zip"
+  zip -r "$ZIP_NAME" META-INF/ *.img 2>/dev/null
+  echo ">>> 卡刷包: $OUT/$ZIP_NAME"
   cd ..
 }
 
@@ -66,16 +78,25 @@ build_super() {
     --metadata-size=65536
     --metadata-slots=2
     --group=main:"$SUPER_SIZE"
-    --output="$OUT/super.img"
+    --output="$OUT/${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}-super.img"
   )
   for p in "${PARTITIONS[@]}"; do
     LPM_ARGS+=(--partition="$p:readonly:0:main")
     LPM_ARGS+=(--image="$p=coloros/$p.img")
   done
   lpmake "${LPM_ARGS[@]}"
+  echo ">>> super.img: $OUT/${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}-super.img"
 }
 
 pack_partitions
+
+# 重命名 system.img
+if [ -f "coloros/system.img" ]; then
+  IMG_NAME="${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}-system.img"
+  cp "coloros/system.img" "$OUT/$IMG_NAME"
+  echo ">>> 系统镜像: $OUT/$IMG_NAME"
+fi
+
 case "$PACK_MODE" in
   zip)   build_zip ;;
   super) build_super ;;
