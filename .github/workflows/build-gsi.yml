@@ -1,10 +1,10 @@
-name: Patch GSI (Universal)
+name: Build GSI (Universal)
 
 on:
   workflow_dispatch:
     inputs:
       gsi_url:
-        description: 'GSI 镜像直链（system.img）'
+        description: 'GSI 基础镜像直链（system.img）'
         required: true
       device_tree_repo:
         description: '设备树仓库地址'
@@ -19,15 +19,11 @@ on:
       defconfig_name:
         description: 'defconfig 名'
         required: true
-      kernel_img_url:
-        description: '已编译内核直链（留空则从源码编译）'
-        required: false
-        default: ''
 
 jobs:
-  patch:
+  build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    timeout-minutes: 300
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +32,7 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import yaml, os
-          with open('.github/workflows/patch-gsi-config.yml') as f:
+          with open('.github/workflows/build-gsi-config.yml') as f:
               cfg = yaml.safe_load(f)
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               def walk(prefix, d):
@@ -57,33 +53,42 @@ jobs:
             brotli lz4 xz-utils e2fsprogs gcc-aarch64-linux-gnu u-boot-tools
           pip3 install protobuf pyyaml
 
-      - name: 下载 GSI 镜像
+      - name: 下载 GSI 基础镜像
         run: |
           mkdir -p work/gsi
-          aria2c -x16 -s16 --file-allocation=none "${{ inputs.gsi_url }}" -o work/gsi/system.img
-
-      - name: 克隆设备树
-        run: |
-          mkdir -p work
-          cd work
-          git clone --depth=1 "${{ inputs.device_tree_repo }}" device_tree 2>/dev/null || true
+          aria2c -x16 -s16 --file-allocation=none "${{ inputs.gsi_url }}" -o work/gsi/base.img
 
       - name: 克隆内核源码
         run: |
+          mkdir -p work
           cd work
           git clone --depth=1 -b "${{ inputs.kernel_branch }}" \
             "${{ inputs.kernel_source_repo }}" kernel_src 2>/dev/null || true
 
+      - name: 克隆设备树
+        run: |
+          cd work
+          git clone --depth=1 "${{ inputs.device_tree_repo }}" device_tree 2>/dev/null || true
+
+      - name: 编译内核
+        env:
+          ENABLE_ROOT: ${{ env.CFG_ROOT_ENABLE }}
+          ROOT_TYPE: ${{ env.CFG_ROOT_TYPE }}
+          DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
+          DEVICE_MODEL: ${{ env.CFG_DEVICE_MODEL }}
+          SYSTEM_NAME: ${{ env.CFG_DEVICE_SYSTEM_NAME }}
+        run: bash scripts/build-gsi.sh kernel
+
       - name: 应用 MTK BPF 补丁
         if: env.CFG_KERNEL_PATCH_ENABLE_BPF == 'true'
         env:
-          KERNEL_IMG_URL: ${{ inputs.kernel_img_url }}
+          KERNEL_IMG_URL: ''
           DEFCONFIG_NAME: ${{ inputs.defconfig_name }}
         run: bash scripts/patch-bpf.sh
 
-      - name: 修补 GSI
+      - name: 注入配置并构建 GSI
         env:
-          GSI_IMG: gsi/system.img
+          GSI_IMG: gsi/base.img
           PARTITION_TYPE: ${{ env.CFG_DEVICE_PARTITION_TYPE }}
           DEVICE_MODEL: ${{ env.CFG_DEVICE_MODEL }}
           SYSTEM_NAME: ${{ env.CFG_DEVICE_SYSTEM_NAME }}
@@ -93,7 +98,7 @@ jobs:
           INJECT_MEDIA: ${{ env.CFG_GSI_INJECT_MEDIA }}
           INJECT_PERMISSIONS: ${{ env.CFG_GSI_INJECT_PERMISSIONS }}
           OUTPUT_FORMAT: ${{ env.CFG_GSI_OUTPUT_FORMAT }}
-        run: bash scripts/patch-gsi.sh
+        run: bash scripts/build-gsi.sh gsi
 
       - name: 输出 BPF 补丁状态
         if: env.CFG_KERNEL_PATCH_ENABLE_BPF == 'true'
