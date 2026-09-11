@@ -42,3 +42,82 @@ compile_kernel() {
 if compile_kernel "build.log"; then
   echo "KERNEL_BUILT=true" >> "$GITHUB_ENV"
 else
+  echo ">>> 第一次编译失败，回退 Root 方案"
+  rm -rf kernel_src/out kernel_src/KernelSU kernel_src/KernelSU-Next
+
+  FALLBACK_TYPE="kernelsu"
+  [ "${ROOT_TYPE:-kernelsu-next}" = "kernelsu" ] && FALLBACK_TYPE="kernelsu-next"
+
+  export ENABLE_ROOT=true ROOT_TYPE="$FALLBACK_TYPE" DEFCONFIG_NAME="$DEFCONFIG_NAME" KERNEL_SOURCE_REPO="$KERNEL_SOURCE_REPO"
+
+  bash scripts/integrate-root.sh || {
+    echo "KERNEL_BUILT=false" >> "$GITHUB_ENV"
+    echo "ROOT_FALLBACK_FAILED=true" >> "$GITHUB_ENV"
+    exit 1
+  }
+
+  if compile_kernel "build-fallback.log"; then
+    echo "KERNEL_BUILT=true" >> "$GITHUB_ENV"
+    echo "ROOT_FALLBACK=true" >> "$GITHUB_ENV"
+  else
+    echo "KERNEL_BUILT=false" >> "$GITHUB_ENV"
+    echo "ROOT_FALLBACK_FAILED=true" >> "$GITHUB_ENV"
+    exit 1
+  fi
+fi
+
+# ============================================================
+# 应用 MTK BPF 补丁
+# ============================================================
+echo ">>> 应用 MTK BPF 补丁"
+
+KERNEL_TARGET="${KERNEL_TARGET:-Image.gz-dtb}"
+KERNEL_SRC="kernel_src/out/arch/arm64/boot/${KERNEL_TARGET}"
+[ ! -f "$KERNEL_SRC" ] && echo ">>> 错误: 找不到内核产物 $KERNEL_SRC" && exit 1
+
+BPF_PATCHER="mtk-bpf-patcher"
+if [ ! -f "$BPF_PATCHER" ]; then
+  curl -LSs "https://github.com/R0rt1z2/mtk-bpf-patcher/releases/latest/download/mtk-bpf-patcher" -o "$BPF_PATCHER" 2>/dev/null || true
+  if [ ! -s "$BPF_PATCHER" ]; then
+    git clone --depth=1 https://github.com/R0rt1z2/mtk-bpf-patcher.git 2>/dev/null || true
+    if [ -d "mtk-bpf-patcher" ]; then
+      cd mtk-bpf-patcher
+      if [ -f "Cargo.toml" ]; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null || true
+        source "$HOME/.cargo/env" 2>/dev/null || true
+        cargo build --release 2>&1 | tail -20
+        cp target/release/mtk-bpf-patcher "../$BPF_PATCHER" 2>/dev/null || true
+      fi
+      cd ..
+    fi
+  fi
+  chmod +x "$BPF_PATCHER" 2>/dev/null || true
+fi
+
+mkdir -p base_boot
+
+KERNEL_SUFFIX=""
+[ "${ROOT_INTEGRATED:-false}" = "true" ] && KERNEL_SUFFIX="${KERNEL_SUFFIX}-ksu"
+
+if [ -f "$BPF_PATCHER" ] && [ -x "$BPF_PATCHER" ]; then
+  if "./$BPF_PATCHER" "$KERNEL_SRC" "base_boot/temp_kernel"; then
+    echo ">>> BPF 补丁成功"
+    echo "BPF_PATCHED=true" >> "$GITHUB_ENV"
+    KERNEL_SUFFIX="${KERNEL_SUFFIX}-bpf"
+    mv "base_boot/temp_kernel" "base_boot/kernel"
+  else
+    echo ">>> BPF 补丁失败"
+    echo "BPF_PATCHED=false" >> "$GITHUB_ENV"
+    cp "$KERNEL_SRC" "base_boot/kernel"
+  fi
+else
+  echo ">>> mtk-bpf-patcher 不可用"
+  echo "BPF_PATCHED=false" >> "$GITHUB_ENV"
+  cp "$KERNEL_SRC" "base_boot/kernel"
+fi
+
+KERNEL_NAME="${DEVICE}-${SYSTEM_NAME}-${ANDROID_TAG}-${DATE_TAG}-kernel${KERNEL_SUFFIX}.img"
+cp "base_boot/kernel" "base_boot/$KERNEL_NAME"
+echo ">>> 内核: base_boot/$KERNEL_NAME"
+
+ls -lh base_boot/
